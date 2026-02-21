@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env.local
+.env.production
+node_modules
+.next
+drizzle
+README.md
+docker-compose.yml
+docker-compose.prod.yml
+Dockerfile
+Dockerfile.worker
+*.md
