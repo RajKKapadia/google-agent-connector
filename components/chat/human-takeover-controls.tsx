@@ -168,7 +168,7 @@ export function HumanTakeoverControls({
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
-            className="min-h-[60px] max-h-[150px] resize-none"
+            className="min-h-15 max-h-37.5 resize-none"
             disabled={isSending}
           />
           <Button

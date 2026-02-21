@@ -246,7 +246,7 @@ export function ConnectionForm() {
                   <FormControl>
                     <Textarea
                       placeholder={'{\n  "type": "service_account",\n  "project_id": "...",\n  ...\n}'}
-                      className="font-mono text-sm min-h-[140px] resize-y"
+                      className="font-mono text-sm min-h-35 resize-y"
                       {...field}
                     />
                   </FormControl>

@@ -269,7 +269,7 @@ export function EditConnectionForm({
                   <FormControl>
                     <Textarea
                       placeholder="Leave blank to keep unchanged. Paste new service account JSON to replace."
-                      className="font-mono text-sm min-h-[100px] resize-y"
+                      className="font-mono text-sm min-h-25 resize-y"
                       {...field}
                     />
                   </FormControl>
