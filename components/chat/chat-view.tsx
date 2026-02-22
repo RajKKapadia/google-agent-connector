@@ -101,7 +101,7 @@ export function ChatView({
               </Badge>
             )}
           </div>
-          <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+          <p className="text-sm whitespace-pre-wrap wrap-break-words">{msg.content}</p>
           <span className="text-xs text-muted-foreground mt-1 self-end">
             {format(new Date(msg.timestamp), "HH:mm")}
           </span>
