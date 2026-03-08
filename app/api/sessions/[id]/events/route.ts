@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
-import { endUserSessions, connections } from "@/lib/db/schema";
+import { endUserSessions } from "@/lib/db/schema";
 
 export const runtime = "nodejs"; // SSE requires Node.js runtime, not Edge
 export const dynamic = "force-dynamic";

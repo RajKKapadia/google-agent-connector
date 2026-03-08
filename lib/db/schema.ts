@@ -77,11 +77,13 @@ export const endUserSessions = pgTable(
     waId: text("wa_id").notNull(), // WhatsApp phone number of end user
     cesSessionId: uuid("ces_session_id").defaultRandom().notNull(), // CES session UUID
     mode: sessionModeEnum("mode").default("ai").notNull(),
+    humanModeStartedAt: timestamp("human_mode_started_at"),
     excludeHumanMessagesFromHistory: boolean(
       "exclude_human_messages_from_history"
     )
       .default(false)
       .notNull(),
+    pendingCesContext: text("pending_ces_context"),
     lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -107,11 +109,14 @@ export const messages = pgTable(
     isHumanAgentMessage: boolean("is_human_agent_message")
       .default(false)
       .notNull(),
+    aiHandledAt: timestamp("ai_handled_at"),
     timestamp: timestamp("timestamp").defaultNow().notNull(),
   },
   (t) => [
     index("idx_messages_session_id").on(t.sessionId),
-    index("idx_messages_whatsapp_message_id").on(t.whatsappMessageId),
+    uniqueIndex("unique_messages_whatsapp_message_id").on(
+      t.whatsappMessageId
+    ),
     index("idx_messages_timestamp").on(t.timestamp),
   ]
 );

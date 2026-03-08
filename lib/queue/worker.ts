@@ -16,6 +16,19 @@ function createPubClient() {
   return new IORedis(process.env.REDIS_URL!, { maxRetriesPerRequest: null });
 }
 
+function buildCesInput(messageText: string, pendingCesContext?: string | null) {
+  if (!pendingCesContext) {
+    return messageText;
+  }
+
+  return [
+    "Conversation context from the recent human takeover:",
+    pendingCesContext,
+    "",
+    `Latest user message: ${messageText}`,
+  ].join("\n");
+}
+
 export async function processMessage(job: Job<MessageJobData>): Promise<void> {
   const { connectionId, waId, messageText, messageId } = job.data;
 
@@ -46,12 +59,29 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
         connectionId,
         waId,
       })
+      .onConflictDoNothing({
+        target: [endUserSessions.connectionId, endUserSessions.waId],
+      })
       .returning();
-    session = newSession;
+
+    if (newSession) {
+      session = newSession;
+    } else {
+      session = await db.query.endUserSessions.findFirst({
+        where: and(
+          eq(endUserSessions.connectionId, connectionId),
+          eq(endUserSessions.waId, waId)
+        ),
+      });
+    }
+  }
+
+  if (!session) {
+    throw new Error(`Failed to create session for ${connectionId}/${waId}`);
   }
 
   // 3. Insert incoming message
-  const [incomingMessage] = await db
+  const [insertedIncomingMessage] = await db
     .insert(messages)
     .values({
       sessionId: session.id,
@@ -61,27 +91,52 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
       whatsappMessageId: messageId,
       isHumanAgentMessage: false,
     })
+    .onConflictDoNothing({ target: messages.whatsappMessageId })
     .returning();
 
+  const incomingMessage =
+    insertedIncomingMessage ??
+    (await db.query.messages.findFirst({
+      where: eq(messages.whatsappMessageId, messageId),
+    }));
+
+  if (!incomingMessage) {
+    throw new Error(`Failed to load inbound message ${messageId}`);
+  }
+
   // 4. Update session lastActivityAt
-  await db
-    .update(endUserSessions)
-    .set({ lastActivityAt: new Date(), updatedAt: new Date() })
-    .where(eq(endUserSessions.id, session.id));
+  if (insertedIncomingMessage) {
+    await db
+      .update(endUserSessions)
+      .set({ lastActivityAt: new Date(), updatedAt: new Date() })
+      .where(eq(endUserSessions.id, session.id));
+  }
 
   // 5. Publish incoming message event
-  const pub = createPubClient();
-  try {
-    await pub.publish(
-      `session:${session.id}`,
-      JSON.stringify({ type: "message", message: incomingMessage })
-    );
-  } finally {
-    pub.disconnect();
+  if (insertedIncomingMessage) {
+    const pub = createPubClient();
+    try {
+      await pub.publish(
+        `session:${session.id}`,
+        JSON.stringify({ type: "message", message: incomingMessage })
+      );
+    } finally {
+      pub.disconnect();
+    }
   }
 
   // 6. If mode is 'human', stop here — no CES call
   if (session.mode === "human") {
+    if (!incomingMessage.aiHandledAt) {
+      await db
+        .update(messages)
+        .set({ aiHandledAt: new Date() })
+        .where(eq(messages.id, incomingMessage.id));
+    }
+    return;
+  }
+
+  if (incomingMessage.aiHandledAt) {
     return;
   }
 
@@ -89,7 +144,7 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
   const cesClient = createCESClient(connection);
   const cesResponse = await cesClient.runSession(
     session.cesSessionId,
-    messageText
+    buildCesInput(messageText, session.pendingCesContext)
   );
   const responseText = cesClient.extractTextResponse(cesResponse);
 
@@ -108,6 +163,18 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
       isHumanAgentMessage: false,
     })
     .returning();
+
+  await db
+    .update(messages)
+    .set({ aiHandledAt: new Date() })
+    .where(eq(messages.id, incomingMessage.id));
+
+  if (session.pendingCesContext) {
+    await db
+      .update(endUserSessions)
+      .set({ pendingCesContext: null, updatedAt: new Date() })
+      .where(eq(endUserSessions.id, session.id));
+  }
 
   // 10. Publish outgoing message event
   const pub2 = createPubClient();

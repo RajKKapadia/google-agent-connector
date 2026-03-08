@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, inArray } from "drizzle-orm";
 import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { endUserSessions, connections, messages } from "@/lib/db/schema";
@@ -21,6 +21,29 @@ async function verifySessionOwnership(sessionId: string, userId: string) {
   }
 
   return session;
+}
+
+const CES_CONTEXT_CHAR_LIMIT = 4000;
+
+function buildPendingCesContext(
+  history: Array<{ senderType: "user" | "human_agent"; content: string }>
+) {
+  if (history.length === 0) {
+    return null;
+  }
+
+  const transcript = history
+    .map((message) => {
+      const label = message.senderType === "human_agent" ? "Human agent" : "User";
+      return `${label}: ${message.content.trim()}`;
+    })
+    .join("\n");
+
+  if (transcript.length <= CES_CONTEXT_CHAR_LIMIT) {
+    return transcript;
+  }
+
+  return transcript.slice(transcript.length - CES_CONTEXT_CHAR_LIMIT);
 }
 
 export async function setSessionMode(
@@ -41,8 +64,38 @@ export async function setSessionMode(
     updatedAt: new Date(),
   };
 
-  if (excludeHumanMessages !== undefined) {
-    updateData.excludeHumanMessagesFromHistory = excludeHumanMessages;
+  if (mode === "human") {
+    updateData.humanModeStartedAt = new Date();
+    updateData.pendingCesContext = null;
+  } else {
+    if (excludeHumanMessages !== undefined) {
+      updateData.excludeHumanMessagesFromHistory = excludeHumanMessages;
+    }
+
+    if (!excludeHumanMessages && session.humanModeStartedAt) {
+      const humanModeMessages = await db.query.messages.findMany({
+        where: and(
+          eq(messages.sessionId, sessionId),
+          gte(messages.timestamp, session.humanModeStartedAt)
+        ),
+        orderBy: (t, { asc }) => [asc(t.timestamp)],
+        columns: {
+          senderType: true,
+          content: true,
+        },
+      });
+
+      const replayableHistory = humanModeMessages.filter(
+        (message): message is { senderType: "user" | "human_agent"; content: string } =>
+          message.senderType === "user" || message.senderType === "human_agent"
+      );
+
+      updateData.pendingCesContext = buildPendingCesContext(replayableHistory);
+    } else {
+      updateData.pendingCesContext = null;
+    }
+
+    updateData.humanModeStartedAt = null;
   }
 
   await db
@@ -144,12 +197,14 @@ export async function getUserSessions(connectionId?: string) {
 
   if (connectionIds.length === 0) return [];
 
-  const { inArray } = await import("drizzle-orm");
+  const scopedConnectionIds = connectionId
+    ? connectionIds.filter((id) => id === connectionId)
+    : connectionIds;
+
+  if (scopedConnectionIds.length === 0) return [];
 
   return db.query.endUserSessions.findMany({
-    where: connectionId
-      ? eq(endUserSessions.connectionId, connectionId)
-      : inArray(endUserSessions.connectionId, connectionIds),
+    where: inArray(endUserSessions.connectionId, scopedConnectionIds),
     with: { connection: { columns: { name: true, id: true } } },
     orderBy: (t, { desc }) => [desc(t.lastActivityAt)],
   });

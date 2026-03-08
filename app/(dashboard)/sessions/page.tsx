@@ -36,6 +36,9 @@ export default async function SessionsPage({
   });
 
   const connectionIds = userConnections.map((c) => c.id);
+  const scopedConnectionIds = connectionId
+    ? connectionIds.filter((id) => id === connectionId)
+    : connectionIds;
 
   if (connectionIds.length === 0) {
     return (
@@ -55,13 +58,28 @@ export default async function SessionsPage({
     );
   }
 
-  const whereClause = connectionId
-    ? eq(endUserSessions.connectionId, connectionId)
-    : inArray(endUserSessions.connectionId, connectionIds);
+  if (scopedConnectionIds.length === 0) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Sessions</h1>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/sessions">Clear filter</Link>
+          </Button>
+        </div>
+        <div className="border rounded-lg p-12 text-center">
+          <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            No sessions found for that connection.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch sessions with their latest message to determine unread state
   const sessions = await db.query.endUserSessions.findMany({
-    where: whereClause,
+    where: inArray(endUserSessions.connectionId, scopedConnectionIds),
     with: {
       connection: { columns: { name: true, id: true } },
       messages: {
