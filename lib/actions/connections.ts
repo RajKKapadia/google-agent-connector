@@ -13,11 +13,12 @@ import { PLANS } from "@/lib/stripe";
 import type { PlanKey } from "@/lib/stripe";
 
 const connectionSchema = z.object({
+  type: z.enum(["whatsapp", "website"]).default("whatsapp"),
   name: z.string().min(1, "Name is required").max(100),
-  whatsappAppId: z.string().min(1, "Meta App ID is required"),
-  whatsappAppSecret: z.string().min(1, "Meta App Secret is required"),
-  whatsappPhoneNumberId: z.string().min(1, "Sender ID (Phone Number ID) is required"),
-  whatsappAccessToken: z.string().min(1, "WhatsApp Access Token is required"),
+  whatsappAppId: z.string().optional(),
+  whatsappAppSecret: z.string().optional(),
+  whatsappPhoneNumberId: z.string().optional(),
+  whatsappAccessToken: z.string().optional(),
   cesAppVersion: z
     .string()
     .min(1, "CES App Version path is required")
@@ -38,6 +39,29 @@ const connectionSchema = z.object({
         return false;
       }
     }, "Must be valid service account JSON (type: service_account)"),
+  websiteDomain: z.string().optional(),
+  widgetBubbleColor: z.string().optional(),
+  widgetFontFamily: z.string().optional(),
+  widgetGreeting: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.type === "whatsapp") {
+    if (!data.whatsappAppId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["whatsappAppId"], message: "Meta App ID is required" });
+    }
+    if (!data.whatsappAppSecret?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["whatsappAppSecret"], message: "Meta App Secret is required" });
+    }
+    if (!data.whatsappPhoneNumberId?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["whatsappPhoneNumberId"], message: "Sender ID (Phone Number ID) is required" });
+    }
+    if (!data.whatsappAccessToken?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["whatsappAccessToken"], message: "WhatsApp Access Token is required" });
+    }
+  }
+
+  if (data.type === "website" && !data.websiteDomain?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["websiteDomain"], message: "Website domain is required" });
+  }
 });
 
 export type ConnectionFormData = z.infer<typeof connectionSchema>;
@@ -93,10 +117,13 @@ export async function createConnection(
   }
 
   const whatsappVerifyToken = randomBytes(32).toString("hex");
+  const widgetKey = randomBytes(24).toString("hex");
 
   // Encrypt all sensitive fields
-  const encryptedAppSecret = encrypt(data.whatsappAppSecret);
-  const encryptedAccessToken = encrypt(data.whatsappAccessToken);
+  const encryptedAppSecret = encrypt(data.whatsappAppSecret?.trim() || "website");
+  const encryptedAccessToken = encrypt(
+    data.whatsappAccessToken?.trim() || "website"
+  );
   const encryptedGoogleToken = encrypt(data.googleAccessToken);
 
   const [newConnection] = await db
@@ -104,14 +131,20 @@ export async function createConnection(
     .values({
       userId,
       name: data.name,
-      whatsappAppId: data.whatsappAppId,
+      type: data.type,
+      whatsappAppId: data.whatsappAppId?.trim() || "website",
       whatsappAppSecret: encryptedAppSecret,
-      whatsappPhoneNumberId: data.whatsappPhoneNumberId,
+      whatsappPhoneNumberId: data.whatsappPhoneNumberId?.trim() || "website",
       whatsappAccessToken: encryptedAccessToken,
       whatsappVerifyToken,
-      cesAppVersion: data.cesAppVersion,
+      cesAppVersion: data.cesAppVersion.trim(),
       cesDeployment: data.cesDeployment || null,
       googleAccessToken: encryptedGoogleToken,
+      websiteDomain: data.websiteDomain?.trim() || null,
+      widgetKey: data.type === "website" ? widgetKey : null,
+      widgetBubbleColor: data.widgetBubbleColor?.trim() || "#2563eb",
+      widgetFontFamily: data.widgetFontFamily?.trim() || "Inter, system-ui, sans-serif",
+      widgetGreeting: data.widgetGreeting?.trim() || "Hi! How can we help today?",
     })
     .returning({ id: connections.id });
 
@@ -138,6 +171,7 @@ export async function updateConnection(
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (formData.name !== undefined) updateData.name = formData.name;
+  if (formData.type !== undefined) updateData.type = formData.type;
   if (formData.whatsappAppId !== undefined) updateData.whatsappAppId = formData.whatsappAppId;
   if (formData.whatsappAppSecret !== undefined)
     updateData.whatsappAppSecret = encrypt(formData.whatsappAppSecret);
@@ -150,6 +184,14 @@ export async function updateConnection(
     updateData.cesDeployment = formData.cesDeployment || null;
   if (formData.googleAccessToken !== undefined)
     updateData.googleAccessToken = encrypt(formData.googleAccessToken);
+  if (formData.websiteDomain !== undefined)
+    updateData.websiteDomain = formData.websiteDomain || null;
+  if (formData.widgetBubbleColor !== undefined)
+    updateData.widgetBubbleColor = formData.widgetBubbleColor || null;
+  if (formData.widgetFontFamily !== undefined)
+    updateData.widgetFontFamily = formData.widgetFontFamily || null;
+  if (formData.widgetGreeting !== undefined)
+    updateData.widgetGreeting = formData.widgetGreeting || null;
 
   await db
     .update(connections)

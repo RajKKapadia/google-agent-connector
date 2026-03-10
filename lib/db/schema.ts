@@ -29,6 +29,10 @@ export const senderTypeEnum = pgEnum("sender_type", [
   "ai",
   "human_agent",
 ]);
+export const connectionTypeEnum = pgEnum("connection_type", [
+  "whatsapp",
+  "website",
+]);
 
 // Subscriptions table — one per Clerk userId
 export const subscriptions = pgTable("subscriptions", {
@@ -51,6 +55,7 @@ export const connections = pgTable("connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id").notNull(),
   name: text("name").notNull(),
+  type: connectionTypeEnum("type").default("whatsapp").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   // WhatsApp / Meta fields
   whatsappAppId: text("whatsapp_app_id").notNull(), // Meta App ID
@@ -62,6 +67,11 @@ export const connections = pgTable("connections", {
   cesAppVersion: text("ces_app_version").notNull(), // full path: projects/P/locations/L/apps/A/versions/V
   cesDeployment: text("ces_deployment"), // full path (optional): projects/.../deployments/D
   googleAccessToken: text("google_access_token").notNull(), // encrypted Google OAuth token
+  websiteDomain: text("website_domain"),
+  widgetKey: text("widget_key"),
+  widgetBubbleColor: text("widget_bubble_color"),
+  widgetFontFamily: text("widget_font_family"),
+  widgetGreeting: text("widget_greeting"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -2,11 +2,18 @@
 
 import { useState, type ComponentType, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { ArrowRight, Bot, LockKeyhole, MessageSquareMore } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  Globe,
+  LockKeyhole,
+  MessageSquareMore,
+  Palette,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -19,16 +26,26 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createConnection } from "@/lib/actions/connections";
 
 const formSchema = z.object({
+  type: z.enum(["whatsapp", "website"]),
   name: z.string().min(1, "Name is required").max(100),
-  whatsappAppId: z.string().min(1, "Meta App ID is required"),
-  whatsappAppSecret: z.string().min(1, "Meta App Secret is required"),
-  whatsappPhoneNumberId: z
-    .string()
-    .min(1, "Sender ID (Phone Number ID) is required"),
-  whatsappAccessToken: z.string().min(1, "WhatsApp Access Token is required"),
+  whatsappAppId: z.string().optional(),
+  whatsappAppSecret: z.string().optional(),
+  whatsappPhoneNumberId: z.string().optional(),
+  whatsappAccessToken: z.string().optional(),
+  websiteDomain: z.string().optional(),
+  widgetBubbleColor: z.string().optional(),
+  widgetFontFamily: z.string().optional(),
+  widgetGreeting: z.string().optional(),
   cesAppVersion: z
     .string()
     .min(1, "CES App Version path is required")
@@ -76,16 +93,23 @@ export function ConnectionForm() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      type: "whatsapp",
       name: "",
       whatsappAppId: "",
       whatsappAppSecret: "",
       whatsappPhoneNumberId: "",
       whatsappAccessToken: "",
+      websiteDomain: "",
+      widgetBubbleColor: "#2563eb",
+      widgetFontFamily: "Inter, system-ui, sans-serif",
+      widgetGreeting: "Hi! How can we help today?",
       cesAppVersion: "",
       cesDeployment: "",
       googleAccessToken: "",
     },
   });
+
+  const connectionType = useWatch({ control: form.control, name: "type" });
 
   async function onSubmit(values: FormValues) {
     setIsSubmitting(true);
@@ -114,114 +138,40 @@ export function ConnectionForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <SectionShell
           title="General"
-          description="Give the connection a clear internal name so it is easy to identify in the dashboard."
+          description="Choose a connector type and internal label for your workspace."
           icon={MessageSquareMore}
-        >
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Connection Name</FormLabel>
-                <FormControl>
-                  <Input placeholder="Acme Support Line" {...field} />
-                </FormControl>
-                <FormDescription>
-                  This label is only shown inside your workspace.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </SectionShell>
-
-        <SectionShell
-          title="WhatsApp / Meta"
-          description="These values identify the sending phone number and verify incoming webhook traffic."
-          icon={LockKeyhole}
         >
           <div className="grid gap-5 md:grid-cols-2">
             <FormField
               control={form.control}
-              name="whatsappAppId"
+              name="type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>App ID</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="123456789012345"
-                      className="font-mono"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Meta for Developers → App Settings → Basic.
-                  </FormDescription>
+                  <FormLabel>Connector Type</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                      <SelectItem value="website">Website Widget</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
-              name="whatsappPhoneNumberId"
+              name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Sender ID (Phone Number ID)</FormLabel>
+                  <FormLabel>Connection Name</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="123456789012345"
-                      className="font-mono"
-                      {...field}
-                    />
+                    <Input placeholder="Acme Support Widget" {...field} />
                   </FormControl>
-                  <FormDescription>
-                    Meta Business Manager → WhatsApp → Phone Numbers.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="whatsappAppSecret"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>App Secret</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="App Secret"
-                      className="font-mono"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Used to verify webhook signatures. Stored encrypted.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="whatsappAccessToken"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>WhatsApp Access Token</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="EAABs..."
-                      className="font-mono"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Prefer a permanent system user token. Stored encrypted.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -229,86 +179,117 @@ export function ConnectionForm() {
           </div>
         </SectionShell>
 
+        {connectionType === "whatsapp" && (
+          <SectionShell
+            title="WhatsApp / Meta"
+            description="Provide Meta credentials for webhook verification and outbound messages."
+            icon={LockKeyhole}
+          >
+            <div className="grid gap-5 md:grid-cols-2">
+              <FormField control={form.control} name="whatsappAppId" render={({ field }) => (
+                <FormItem><FormLabel>App ID</FormLabel><FormControl><Input placeholder="123456789012345" className="font-mono" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="whatsappPhoneNumberId" render={({ field }) => (
+                <FormItem><FormLabel>Sender ID (Phone Number ID)</FormLabel><FormControl><Input placeholder="123456789012345" className="font-mono" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="whatsappAppSecret" render={({ field }) => (
+                <FormItem><FormLabel>App Secret</FormLabel><FormControl><Input type="password" className="font-mono" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="whatsappAccessToken" render={({ field }) => (
+                <FormItem><FormLabel>WhatsApp Access Token</FormLabel><FormControl><Input type="password" className="font-mono" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+          </SectionShell>
+        )}
+
+        {connectionType === "website" && (
+          <SectionShell
+            title="Website Widget"
+            description="Secure your widget by domain and customize core appearance settings."
+            icon={Globe}
+          >
+            <div className="grid gap-5 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="websiteDomain"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Allowed Domain</FormLabel>
+                    <FormControl>
+                      <Input placeholder="example.com" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Only this domain can open widget API requests.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="widgetBubbleColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bubble Color</FormLabel>
+                    <FormControl>
+                      <Input placeholder="#2563eb" className="font-mono" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="widgetFontFamily"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Font Family</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Inter, system-ui, sans-serif" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="mt-5">
+              <FormField
+                control={form.control}
+                name="widgetGreeting"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Greeting Message</FormLabel>
+                    <FormControl>
+                      <Textarea className="min-h-24" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </SectionShell>
+        )}
+
         <SectionShell
           title="Google CES Agent"
-          description="Point the connector at the CES app version you want to run and provide a service account for authentication."
+          description="Point the connector at your CES app version and service account key."
           icon={Bot}
         >
           <div className="grid gap-5 lg:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="cesAppVersion"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>App Version</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="projects/my-project/locations/us/apps/app-id/versions/version-id"
-                      className="font-mono text-sm"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Full version path from the CES console.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="cesDeployment"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Deployment (Optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="projects/my-project/locations/us/apps/app-id/deployments/deployment-id"
-                      className="font-mono text-sm"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Use this when traffic should target a specific deployment.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormField control={form.control} name="cesAppVersion" render={({ field }) => (
+              <FormItem><FormLabel>App Version</FormLabel><FormControl><Input placeholder="projects/my-project/locations/us/apps/app-id/versions/version-id" className="font-mono text-sm" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={form.control} name="cesDeployment" render={({ field }) => (
+              <FormItem><FormLabel>Deployment (Optional)</FormLabel><FormControl><Input placeholder="projects/my-project/locations/us/apps/app-id/deployments/deployment-id" className="font-mono text-sm" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
           </div>
 
           <div className="mt-5 space-y-4">
-            <FormField
-              control={form.control}
-              name="googleAccessToken"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Service Account JSON</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder={'{\n  "type": "service_account",\n  "project_id": "...",\n  ...\n}'}
-                      className="min-h-48 resize-y font-mono text-sm"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Paste the full JSON key contents. The connector refreshes
-                    access tokens automatically.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+            <FormField control={form.control} name="googleAccessToken" render={({ field }) => (
+              <FormItem><FormLabel>Service Account JSON</FormLabel><FormControl><Textarea placeholder={'{\n  "type": "service_account",\n  "project_id": "..."\n}'} className="min-h-48 resize-y font-mono text-sm" {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
             <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950">
-              <p className="font-semibold">Service account checklist</p>
-              <ol className="mt-2 space-y-1.5 text-sky-900">
-                <li>1. Create a service account in Google Cloud IAM.</li>
-                <li>2. Grant the CES-compatible client role you intend to use.</li>
-                <li>3. Create a JSON key and paste the full contents above.</li>
-                <li>4. Keep the original file out of source control and shared docs.</li>
-              </ol>
+              <p className="font-semibold flex items-center gap-2"><Palette className="h-4 w-4" />Widget settings can be updated later from Edit Connection.</p>
             </div>
           </div>
         </SectionShell>
@@ -318,11 +299,7 @@ export function ConnectionForm() {
             {isSubmitting ? "Creating..." : "Create Connection"}
             {!isSubmitting && <ArrowRight className="h-4 w-4" />}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push("/connections")}
-          >
+          <Button type="button" variant="outline" onClick={() => router.push("/connections")}>
             Cancel
           </Button>
         </div>

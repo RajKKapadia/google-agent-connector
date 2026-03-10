@@ -40,7 +40,7 @@ export default async function ConnectionsPage() {
           <Plug className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">No connections yet</h3>
           <p className="text-muted-foreground mb-4">
-            Create your first connection to link a WhatsApp number to a CES agent.
+            Create your first connection to link either a WhatsApp number or a website widget to a CES agent.
           </p>
           <Button asChild>
             <Link href="/connections/new">
@@ -57,19 +57,28 @@ export default async function ConnectionsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{conn.name}</CardTitle>
                   <Badge variant="secondary" className="text-xs">
-                    Active
+                    {conn.type === "website" ? "Website" : "WhatsApp"}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="flex-1 text-sm text-muted-foreground space-y-1">
-                <p>
-                  <span className="font-medium">Phone ID:</span>{" "}
-                  <span className="font-mono">{conn.whatsappPhoneNumberId}</span>
-                </p>
-                <p>
-                  <span className="font-medium">Meta App ID:</span>{" "}
-                  <span className="font-mono">{conn.whatsappAppId}</span>
-                </p>
+                {conn.type === "website" ? (
+                  <p>
+                    <span className="font-medium">Domain:</span>{" "}
+                    <span className="font-mono">{conn.websiteDomain}</span>
+                  </p>
+                ) : (
+                  <>
+                    <p>
+                      <span className="font-medium">Phone ID:</span>{" "}
+                      <span className="font-mono">{conn.whatsappPhoneNumberId}</span>
+                    </p>
+                    <p>
+                      <span className="font-medium">Meta App ID:</span>{" "}
+                      <span className="font-mono">{conn.whatsappAppId}</span>
+                    </p>
+                  </>
+                )}
                 <p className="truncate">
                   <span className="font-medium">App Version:</span>{" "}
                   <span className="font-mono text-xs">{conn.cesAppVersion}</span>
