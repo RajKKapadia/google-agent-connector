@@ -15,8 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { ConnectionForm } from "@/components/connections/connection-form";
 
 const checklist = [
-  "Meta App ID and App Secret",
-  "WhatsApp Phone Number ID and permanent access token",
+  "Choose connector type: WhatsApp or Website Widget",
+  "For website widgets: allowed domain and style settings",
+  "For WhatsApp: Meta App ID, App Secret, phone ID, and access token",
   "CES app version path and optional deployment path",
   "Google service account JSON with CES access",
 ];
@@ -37,8 +38,7 @@ export default function NewConnectionPage() {
             Create Connection
           </h1>
           <p className="text-sm text-muted-foreground">
-            Link a WhatsApp Business number to a CES agent and get the webhook
-            flow ready for live conversations.
+            Create a WhatsApp or Website Widget connector and link it to a CES agent for live conversations.
           </p>
         </div>
         <Badge

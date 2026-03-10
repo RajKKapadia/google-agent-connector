@@ -6,12 +6,7 @@ import { db } from "@/lib/db";
 import { connections, endUserSessions } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { WebhookUrlDisplay } from "@/components/dashboard/webhook-url-display";
 import { DeleteConnectionButton } from "@/components/connections/delete-connection-button";
@@ -38,6 +33,11 @@ export default async function ConnectionDetailPage({
     .from(endUserSessions)
     .where(eq(endUserSessions.connectionId, id));
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const scriptTag = connection.type === "website" && connection.widgetKey
+    ? `<script src="${appUrl}/api/widget/${connection.id}/script?key=${connection.widgetKey}" defer></script>`
+    : null;
+
   return (
     <div className="max-w-3xl space-y-6">
       <div className="flex items-center gap-3">
@@ -49,7 +49,7 @@ export default async function ConnectionDetailPage({
         </Button>
         <h1 className="text-2xl font-bold">{connection.name}</h1>
         <Badge variant={connection.isActive ? "secondary" : "destructive"}>
-          {connection.isActive ? "Active" : "Inactive"}
+          {connection.type === "website" ? "Website" : "WhatsApp"}
         </Badge>
         <Button variant="outline" size="sm" className="ml-auto" asChild>
           <Link href={`/connections/${id}/edit`}>
@@ -61,77 +61,67 @@ export default async function ConnectionDetailPage({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Sessions
-            </CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Sessions</CardTitle></CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{sessionCount}</div>
             <Button variant="link" className="p-0 h-auto text-xs" asChild>
-              <Link href={`/sessions?connectionId=${id}`}>
-                View sessions <ExternalLink className="h-3 w-3 ml-1" />
-              </Link>
+              <Link href={`/sessions?connectionId=${id}`}>View sessions <ExternalLink className="h-3 w-3 ml-1" /></Link>
             </Button>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">
-              Created
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-base font-medium">
-              {connection.createdAt.toLocaleDateString()}
-            </div>
-          </CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Created</CardTitle></CardHeader>
+          <CardContent><div className="text-base font-medium">{connection.createdAt.toLocaleDateString()}</div></CardContent>
         </Card>
       </div>
 
-      <WebhookUrlDisplay
-        connectionId={connection.id}
-        verifyToken={connection.whatsappVerifyToken}
-      />
+      {connection.type === "whatsapp" ? (
+        <WebhookUrlDisplay connectionId={connection.id} verifyToken={connection.whatsappVerifyToken} />
+      ) : scriptTag ? (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Website Embed Script</CardTitle></CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p className="text-muted-foreground">Add this script before the closing <code>&lt;/body&gt;</code> tag on <span className="font-medium">{connection.websiteDomain}</span>.</p>
+            <pre className="rounded-md border bg-muted/30 p-3 text-xs overflow-x-auto"><code>{scriptTag}</code></pre>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Connection Details</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-base">Connection Details</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="grid grid-cols-2 gap-y-3">
-            <span className="text-muted-foreground">Phone Number ID</span>
-            <span className="font-mono">{connection.whatsappPhoneNumberId}</span>
-
-            <span className="text-muted-foreground">Meta App ID</span>
-            <span className="font-mono">{connection.whatsappAppId}</span>
+            {connection.type === "website" ? (
+              <>
+                <span className="text-muted-foreground">Allowed Domain</span>
+                <span className="font-mono">{connection.websiteDomain}</span>
+                <span className="text-muted-foreground">Bubble Color</span>
+                <span className="font-mono">{connection.widgetBubbleColor}</span>
+                <span className="text-muted-foreground">Font Family</span>
+                <span className="font-mono text-xs truncate">{connection.widgetFontFamily}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">Phone Number ID</span>
+                <span className="font-mono">{connection.whatsappPhoneNumberId}</span>
+                <span className="text-muted-foreground">Meta App ID</span>
+                <span className="font-mono">{connection.whatsappAppId}</span>
+              </>
+            )}
 
             <span className="text-muted-foreground">App Version</span>
             <span className="font-mono text-xs truncate">{connection.cesAppVersion}</span>
-
-            {connection.cesDeployment && (
-              <>
-                <span className="text-muted-foreground">Deployment</span>
-                <span className="font-mono text-xs truncate">{connection.cesDeployment}</span>
-              </>
-            )}
           </div>
         </CardContent>
       </Card>
 
       <Separator />
-
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium">Danger Zone</h3>
-          <p className="text-sm text-muted-foreground">
-            Deleting this connection will stop all message processing.
-          </p>
+          <p className="text-sm text-muted-foreground">Deleting this connection will stop all message processing.</p>
         </div>
-        <DeleteConnectionButton
-          connectionId={connection.id}
-          connectionName={connection.name}
-        />
+        <DeleteConnectionButton connectionId={connection.id} connectionName={connection.name} />
       </div>
     </div>
   );
