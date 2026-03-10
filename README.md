@@ -1,221 +1,221 @@
 # CES Connector
 
-A SaaS platform that bridges **WhatsApp Business** with **Google Customer Engagement Suite (CES) AI Agent Studio**. Users create connections that link a WhatsApp Business number to a CES AI agent, enabling automated conversations with real-time human takeover capability.
+CES Connector is a SaaS application that connects **WhatsApp Business** conversations to a **Google Customer Engagement Suite (CES) AI Agent Studio** app.
 
----
+It lets teams:
 
-## How It Works
+- Receive inbound WhatsApp messages through Meta webhooks.
+- Route messages to a CES AI agent for automated replies.
+- Step into live conversations with **human takeover**.
+- Manage multiple WhatsApp↔CES connections from one dashboard.
+- Enforce subscription limits with Stripe billing.
 
-```
+## Architecture Overview
+
+```text
 WhatsApp User
-     │  sends message
-     ▼
-POST /api/webhooks/[connectionId]   ← validates HMAC signature, enqueues job
-     │
-     ▼
-BullMQ Worker (Redis)               ← processes message asynchronously
-     │  calls CES API, sends WhatsApp reply, stores messages
-     ▼
-SSE /api/sessions/[id]/events       ← pushes new messages to dashboard in real-time
-     ▼
-Dashboard Chat View                 ← live chat with human takeover controls
+   │ sends message
+   ▼
+/api/webhooks/[connectionId]
+   │ verifies Meta HMAC, normalizes payload, enqueues job
+   ▼
+BullMQ Worker (Redis)
+   │ calls CES API, persists messages, sends WhatsApp response
+   ▼
+PostgreSQL + SSE stream (/api/sessions/[id]/events)
+   ▼
+Dashboard session view (real-time updates + takeover controls)
 ```
-
----
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, TypeScript) |
-| Auth | Clerk |
-| Database | PostgreSQL + Drizzle ORM |
-| Queue | BullMQ + Redis |
-| AI Agent | Google CES Agent Studio (REST API v1beta) |
-| Messaging | WhatsApp Cloud API (Meta) |
-| Payments | Stripe |
-| UI | shadcn/ui + Tailwind CSS |
-| Deployment | Docker Compose |
-
----
+- **Framework:** Next.js 16 (App Router) + TypeScript
+- **Auth:** Clerk
+- **Database:** PostgreSQL + Drizzle ORM
+- **Queue:** BullMQ + Redis
+- **AI integration:** Google CES Agent Studio REST API
+- **Messaging integration:** WhatsApp Cloud API
+- **Billing:** Stripe
+- **UI:** shadcn/ui + Tailwind CSS
+- **Deployment:** Docker Compose (app + worker + postgres + redis)
 
 ## Prerequisites
 
-- Node.js 20+ and pnpm
-- Docker (for local PostgreSQL + Redis)
-- A [Clerk](https://clerk.com) account
-- A [Meta Developer](https://developers.facebook.com) account with a WhatsApp Business app
-- A Google Cloud project with Customer Engagement Suite enabled and a service account
-- A [Stripe](https://stripe.com) account with three subscription price IDs
+Before running locally, make sure you have:
 
----
+1. Node.js 20+
+2. pnpm
+3. Docker + Docker Compose
+4. Accounts/credentials for:
+   - Clerk
+   - Meta Developer (WhatsApp Cloud API)
+   - Google Cloud (CES enabled + service account)
+   - Stripe (three plan price IDs)
 
-## Local Development
+## Quick Start (Local Development)
 
-### 1. Clone and install
+### 1) Install dependencies
 
 ```bash
-git clone <repo-url>
-cd ces-connector
 pnpm install
 ```
 
-### 2. Start infrastructure
+### 2) Start Postgres + Redis
 
 ```bash
 docker compose up -d
 ```
 
-This starts PostgreSQL on port `5432` and Redis on port `6379`.
-
-### 3. Configure environment
+### 3) Create local env file
 
 ```bash
 cp .env.example .env.local
 ```
 
-Fill in all values in `.env.local`:
+Then fill all values in `.env.local`.
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_APP_URL` | App base URL (e.g. `http://localhost:3000`) |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `CLERK_SECRET_KEY` | Clerk secret key |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `ENCRYPTION_KEY` | 64-char hex key — run `openssl rand -hex 32` |
-| `WHATSAPP_APP_SECRET` | Meta app secret (for HMAC webhook verification) |
-| `STRIPE_SECRET_KEY` | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
-| `STRIPE_STARTER_PRICE_ID` | Price ID for Starter plan ($19/mo) |
-| `STRIPE_BUSINESS_PRICE_ID` | Price ID for Business plan ($49/mo) |
-| `STRIPE_ENTERPRISE_PRICE_ID` | Price ID for Enterprise plan ($99/mo) |
-
-### 4. Run database migrations
+### 4) Apply database schema
 
 ```bash
 pnpm db:push
 ```
 
-### 5. Start the app
+### 5) Run the app and worker
 
 ```bash
-# Next.js + worker together
 pnpm dev:all
-
-# Or separately
-pnpm dev          # Next.js on :3000
-pnpm dev:worker   # BullMQ worker
 ```
 
----
+This starts:
 
-## Setting Up a WhatsApp Connection
+- Next.js app on `http://localhost:3000`
+- Worker process that handles queued inbound/outbound messages
 
-1. **Create a connection** in the dashboard under **Connections → New Connection**. You will need:
-   - WhatsApp Phone Number ID and App ID from the Meta Developer console
-   - WhatsApp access token (use a permanent System User token from Meta Business Manager)
-   - Google CES app details (project, location, app ID, version)
-   - Google service account JSON with the CES client role
+## Environment Variables
 
-2. **Configure the Meta webhook**:
-   - Use [ngrok](https://ngrok.com) in development: `ngrok http 3000`
-   - Set the webhook URL in Meta to: `https://<your-domain>/api/webhooks/<connectionId>`
-   - Set the verify token to the value shown on the connection detail page
-   - Subscribe to the `messages` field
+Copy `.env.example` and provide values for all variables. Key settings include:
 
-3. **Send a WhatsApp message** to your number — it will appear in the session dashboard in real-time.
+- `NEXT_PUBLIC_APP_URL`: Public app URL.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`: Clerk auth.
+- `DATABASE_URL`: PostgreSQL connection string.
+- `REDIS_URL`: Redis connection string.
+- `ENCRYPTION_KEY`: 64-char hex key for credential encryption.
+- `WHATSAPP_APP_SECRET`: Used to verify Meta webhook signatures.
+- `STRIPE_*`: Stripe API key, webhook secret, and plan price IDs.
 
----
+Generate an encryption key with:
 
-## Human Takeover
+```bash
+openssl rand -hex 32
+```
 
-On any session detail page:
+## WhatsApp Connection Setup
 
-- Click **Take Over** to switch from AI mode to human agent mode. The AI stops responding and you can send messages directly from the dashboard.
-- Click **Return to AI** to hand back control. You can optionally exclude the human-mode messages from the AI's conversation history.
+After signing in to the dashboard:
 
----
+1. Go to **Connections → New Connection**.
+2. Enter WhatsApp credentials:
+   - App ID
+   - Phone Number ID
+   - Access token (recommended: permanent System User token)
+3. Enter CES details:
+   - GCP project/location
+   - CES app ID + app version
+   - Service account JSON (with required CES access)
+4. Save the connection.
 
-## Subscription Plans
+Then configure Meta webhook:
 
-| Plan | Connections | Price |
-|---|---|---|
-| Starter | 1 | $19/mo |
-| Business | 5 | $49/mo |
-| Enterprise | 20 | $99/mo |
+- Webhook URL: `https://<your-domain>/api/webhooks/<connectionId>`
+- Verify token: shown on the connection details page
+- Subscribed field: `messages`
 
-Connection limits are enforced server-side when creating a new connection.
+For local testing, expose your app with ngrok:
 
-To test Stripe webhooks locally:
+```bash
+ngrok http 3000
+```
+
+## Human Takeover Flow
+
+From a session page:
+
+- **Take Over:** pauses AI replies and enables manual responses from the dashboard.
+- **Return to AI:** resumes CES responses. You can optionally exclude takeover messages from AI context.
+
+## Billing and Plan Limits
+
+Plans are enforced server-side when creating connections:
+
+- Starter: 1 connection
+- Business: 5 connections
+- Enterprise: 20 connections
+
+Test Stripe webhooks locally:
 
 ```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
----
-
-## Database
+## Database Commands
 
 ```bash
-pnpm db:generate   # generate migration files from schema changes
-pnpm db:migrate    # apply migrations
-pnpm db:push       # push schema directly (dev only)
-pnpm db:studio     # open Drizzle Studio in browser
+pnpm db:generate   # Generate migration files
+pnpm db:migrate    # Apply migrations
+pnpm db:push       # Push schema directly (dev)
+pnpm db:studio     # Open Drizzle Studio
 ```
-
----
 
 ## Production Deployment
 
-The project includes Docker configuration for self-hosted VPS deployment.
+Use the production compose file:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-Four services run in an isolated Docker network:
+Services:
 
-- `postgres` — PostgreSQL database
-- `redis` — Redis for queue and SSE pub/sub
-- `app` — Next.js application (port 3000)
-- `worker` — BullMQ message processing worker
+- `app` (Next.js)
+- `worker` (BullMQ processor)
+- `postgres`
+- `redis`
 
-Set production secrets in a `.env.production` file (never commit this file).
-
----
+Use a `.env.production` file for deployment secrets. Do not commit it.
 
 ## Project Structure
 
-```
+```text
 app/
-├── (landing)/          # Public marketing pages
-├── (dashboard)/        # Authenticated app
-│   ├── dashboard/      # Overview stats
-│   ├── connections/    # Manage WhatsApp ↔ CES connections
-│   ├── sessions/       # End-user chat sessions
-│   └── billing/        # Subscription management
-├── api/
-│   ├── webhooks/[connectionId]/   # WhatsApp webhook receiver
-│   ├── sessions/[id]/events/      # SSE real-time chat stream
-│   └── stripe/webhook/            # Stripe billing events
-lib/
-├── ces/                # Google CES API client
-├── whatsapp/           # WhatsApp Cloud API client
-├── queue/              # BullMQ job definitions and worker
-├── actions/            # Next.js Server Actions
-├── db/                 # Drizzle schema and client
-├── stripe/             # Stripe helpers and plan config
-└── encryption.ts       # AES-256-GCM credential encryption
-worker/
-└── index.ts            # Standalone worker process entry point
-```
+├── (landing)/                # Public marketing pages
+├── (dashboard)/              # Authenticated product UI
+├── api/webhooks/[connectionId]/route.ts
+├── api/sessions/[id]/events/route.ts
+└── api/stripe/webhook/route.ts
 
----
+lib/
+├── actions/                  # Server actions
+├── ces/                      # CES API client
+├── db/                       # Drizzle schema + db client
+├── queue/                    # BullMQ queue + worker wiring
+├── stripe/                   # Billing helpers
+├── whatsapp/                 # WhatsApp client
+└── encryption.ts             # AES-256-GCM encryption helpers
+
+worker/index.ts               # Standalone worker entry point
+```
 
 ## Security Notes
 
-- WhatsApp access tokens and Google service account JSON are encrypted with AES-256-GCM before being stored in the database. The `ENCRYPTION_KEY` must be kept secret and must not change after data has been written.
-- All incoming WhatsApp webhooks are verified with HMAC-SHA256 using the Meta app secret.
-- Routes are protected by Clerk middleware — only `/api/webhooks/*` and `/api/stripe/webhook` are public.
+- Sensitive third-party credentials are encrypted before DB storage.
+- Incoming WhatsApp webhooks are signature-verified.
+- Clerk protects authenticated routes; webhook endpoints are intentionally public.
+
+## Available Scripts
+
+- `pnpm dev`: Start Next.js dev server.
+- `pnpm dev:worker`: Start worker in watch mode.
+- `pnpm dev:all`: Run app + worker together.
+- `pnpm build`: Production build.
+- `pnpm start`: Run production server.
+- `pnpm lint`: Run ESLint.
