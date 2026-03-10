@@ -234,6 +234,9 @@ export function ConnectionForm() {
                     <FormControl>
                       <Input placeholder="#2563eb" className="font-mono" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Hex color used for the floating chat bubble.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -280,7 +283,7 @@ export function ConnectionForm() {
               <FormItem><FormLabel>App Version</FormLabel><FormControl><Input placeholder="projects/my-project/locations/us/apps/app-id/versions/version-id" className="font-mono text-sm" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="cesDeployment" render={({ field }) => (
-              <FormItem><FormLabel>Deployment (Optional)</FormLabel><FormControl><Input placeholder="projects/my-project/locations/us/apps/app-id/deployments/deployment-id" className="font-mono text-sm" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Deployment (Optional)</FormLabel><FormControl><Input placeholder="projects/my-project/locations/us/apps/app-id/deployments/deployment-id" className="font-mono text-sm" {...field} /></FormControl><FormDescription>Optional override when targeting a specific deployment.</FormDescription><FormMessage /></FormItem>
             )} />
           </div>
 
