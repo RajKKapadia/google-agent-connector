@@ -91,6 +91,10 @@ export default async function ConnectionDetailPage({
           <div className="grid grid-cols-2 gap-y-3">
             {connection.type === "website" ? (
               <>
+                <span className="text-muted-foreground">Widget Title</span>
+                <span className="font-medium">
+                  {connection.widgetTitle || connection.name}
+                </span>
                 <span className="text-muted-foreground">Allowed Site(s)</span>
                 <span className="font-mono">{connection.websiteDomain}</span>
                 <span className="text-muted-foreground">Bubble Color</span>
