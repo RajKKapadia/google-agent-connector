@@ -40,9 +40,9 @@ const connectionSchema = z.object({
       }
     }, "Must be valid service account JSON (type: service_account)"),
   websiteDomain: z.string().optional(),
+  widgetTitle: z.string().optional(),
   widgetBubbleColor: z.string().optional(),
   widgetFontFamily: z.string().optional(),
-  widgetGreeting: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.type === "whatsapp") {
     if (!data.whatsappAppId?.trim()) {
@@ -61,6 +61,10 @@ const connectionSchema = z.object({
 
   if (data.type === "website" && !data.websiteDomain?.trim()) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["websiteDomain"], message: "Website domain is required" });
+  }
+
+  if (data.type === "website" && !data.widgetTitle?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["widgetTitle"], message: "Widget title is required" });
   }
 });
 
@@ -142,9 +146,12 @@ export async function createConnection(
       googleAccessToken: encryptedGoogleToken,
       websiteDomain: data.websiteDomain?.trim() || null,
       widgetKey: data.type === "website" ? widgetKey : null,
+      widgetTitle:
+        data.type === "website"
+          ? data.widgetTitle?.trim() || data.name.trim()
+          : null,
       widgetBubbleColor: data.widgetBubbleColor?.trim() || "#2563eb",
       widgetFontFamily: data.widgetFontFamily?.trim() || "Inter, system-ui, sans-serif",
-      widgetGreeting: data.widgetGreeting?.trim() || "Hi! How can we help today?",
     })
     .returning({ id: connections.id });
 
@@ -186,12 +193,12 @@ export async function updateConnection(
     updateData.googleAccessToken = encrypt(formData.googleAccessToken);
   if (formData.websiteDomain !== undefined)
     updateData.websiteDomain = formData.websiteDomain || null;
+  if (formData.widgetTitle !== undefined)
+    updateData.widgetTitle = formData.widgetTitle || null;
   if (formData.widgetBubbleColor !== undefined)
     updateData.widgetBubbleColor = formData.widgetBubbleColor || null;
   if (formData.widgetFontFamily !== undefined)
     updateData.widgetFontFamily = formData.widgetFontFamily || null;
-  if (formData.widgetGreeting !== undefined)
-    updateData.widgetGreeting = formData.widgetGreeting || null;
 
   await db
     .update(connections)

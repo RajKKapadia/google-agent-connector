@@ -33,9 +33,11 @@ export async function GET(
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
+  const appOrigin = new URL(appUrl).origin;
 
   const js = `(function(){
-  const iframeUrl = ${JSON.stringify(`${appUrl}/widget/${connectionId}?key=${key}`)};
+  const iframeUrlBase = ${JSON.stringify(`${appUrl}/widget/${connectionId}?key=${key}`)};
+  const closeMessageType = 'ces-widget-close';
   const btn = document.createElement('button');
   btn.innerText = 'Chat';
   btn.style.position = 'fixed';
@@ -66,11 +68,20 @@ export async function GET(
   frame.style.zIndex = '2147483646';
   let hasLoadedFrame = false;
 
+  window.addEventListener('message', function(event){
+    if (event.origin !== ${JSON.stringify(appOrigin)}) return;
+    if (!event.data || event.data.type !== closeMessageType) return;
+    if (event.data.connectionId !== ${JSON.stringify(connectionId)}) return;
+    frame.style.display = 'none';
+  });
+
   btn.onclick = function(){
     const shouldOpen = frame.style.display === 'none';
 
     if (shouldOpen && !hasLoadedFrame) {
-      frame.src = iframeUrl;
+      const iframeUrl = new URL(iframeUrlBase);
+      iframeUrl.searchParams.set('origin', window.location.origin);
+      frame.src = iframeUrl.toString();
       hasLoadedFrame = true;
     }
 

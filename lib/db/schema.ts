@@ -69,6 +69,7 @@ export const connections = pgTable("connections", {
   googleAccessToken: text("google_access_token").notNull(), // encrypted Google OAuth token
   websiteDomain: text("website_domain"),
   widgetKey: text("widget_key"),
+  widgetTitle: text("widget_title"),
   widgetBubbleColor: text("widget_bubble_color"),
   widgetFontFamily: text("widget_font_family"),
   widgetGreeting: text("widget_greeting"),

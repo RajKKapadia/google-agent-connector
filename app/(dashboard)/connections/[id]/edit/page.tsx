@@ -37,12 +37,17 @@ export default async function EditConnectionPage({
 
       <EditConnectionForm
         connectionId={id}
+        connectionType={connection.type}
         defaultValues={{
           name: connection.name,
           whatsappAppId: connection.whatsappAppId,
           whatsappPhoneNumberId: connection.whatsappPhoneNumberId,
           cesAppVersion: connection.cesAppVersion,
           cesDeployment: connection.cesDeployment,
+          websiteDomain: connection.websiteDomain,
+          widgetTitle: connection.widgetTitle,
+          widgetBubbleColor: connection.widgetBubbleColor,
+          widgetFontFamily: connection.widgetFontFamily,
         }}
       />
     </div>

@@ -43,9 +43,9 @@ const formSchema = z.object({
   whatsappPhoneNumberId: z.string().optional(),
   whatsappAccessToken: z.string().optional(),
   websiteDomain: z.string().optional(),
+  widgetTitle: z.string().optional(),
   widgetBubbleColor: z.string().optional(),
   widgetFontFamily: z.string().optional(),
-  widgetGreeting: z.string().optional(),
   cesAppVersion: z
     .string()
     .min(1, "CES App Version path is required")
@@ -100,9 +100,9 @@ export function ConnectionForm() {
       whatsappPhoneNumberId: "",
       whatsappAccessToken: "",
       websiteDomain: "",
+      widgetTitle: "",
       widgetBubbleColor: "#2563eb",
       widgetFontFamily: "Inter, system-ui, sans-serif",
-      widgetGreeting: "Hi! How can we help today?",
       cesAppVersion: "",
       cesDeployment: "",
       googleAccessToken: "",
@@ -211,6 +211,22 @@ export function ConnectionForm() {
             <div className="grid items-start gap-5 md:grid-cols-2">
               <FormField
                 control={form.control}
+                name="widgetTitle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Widget Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Acme Realty Co." {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Public title shown in the widget header.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="websiteDomain"
                 render={({ field }) => (
                   <FormItem>
@@ -250,21 +266,6 @@ export function ConnectionForm() {
                     <FormLabel>Font Family</FormLabel>
                     <FormControl>
                       <Input placeholder="Inter, system-ui, sans-serif" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="mt-5">
-              <FormField
-                control={form.control}
-                name="widgetGreeting"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Greeting Message</FormLabel>
-                    <FormControl>
-                      <Textarea className="min-h-24" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
