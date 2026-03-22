@@ -141,7 +141,7 @@ export function ConnectionForm() {
           description="Choose a connector type and internal label for your workspace."
           icon={MessageSquareMore}
         >
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid items-start gap-5 md:grid-cols-2">
             <FormField
               control={form.control}
               name="type"
@@ -185,7 +185,7 @@ export function ConnectionForm() {
             description="Provide Meta credentials for webhook verification and outbound messages."
             icon={LockKeyhole}
           >
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid items-start gap-5 md:grid-cols-2">
               <FormField control={form.control} name="whatsappAppId" render={({ field }) => (
                 <FormItem><FormLabel>App ID</FormLabel><FormControl><Input placeholder="123456789012345" className="font-mono" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
@@ -208,7 +208,7 @@ export function ConnectionForm() {
             description="Secure your widget by domain and customize core appearance settings."
             icon={Globe}
           >
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid items-start gap-5 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="websiteDomain"
@@ -278,7 +278,7 @@ export function ConnectionForm() {
           description="Point the connector at your CES app version and service account key."
           icon={Bot}
         >
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid items-start gap-5 lg:grid-cols-2">
             <FormField control={form.control} name="cesAppVersion" render={({ field }) => (
               <FormItem><FormLabel>App Version</FormLabel><FormControl><Input placeholder="projects/my-project/locations/us/apps/app-id/versions/version-id" className="font-mono text-sm" {...field} /></FormControl><FormMessage /></FormItem>
             )} />

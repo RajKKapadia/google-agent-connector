@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "dev:worker": "tsx --env-file=.env.local watch worker/index.ts",
+    "dev:worker": "tsx --env-file=.env.local --watch worker/index.ts",
     "dev:all": "concurrently \"pnpm dev\" \"pnpm dev:worker\"",
     "build": "next build",
     "start": "next start",
