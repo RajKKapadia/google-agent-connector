@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { connections } from "@/lib/db/schema";
+import { getWidgetEmbedSource, isAllowedWidgetSite } from "@/lib/widget/security";
 
 export async function GET(
   req: NextRequest,
@@ -16,6 +17,17 @@ export async function GET(
 
   if (!connection || connection.type !== "website" || !key || key !== connection.widgetKey) {
     return new Response("console.error('Invalid widget config');", {
+      headers: { "content-type": "application/javascript" },
+    });
+  }
+
+  if (
+    !isAllowedWidgetSite(
+      getWidgetEmbedSource(req.headers),
+      connection.websiteDomain
+    )
+  ) {
+    return new Response("console.error('Widget is not allowed on this site');", {
       headers: { "content-type": "application/javascript" },
     });
   }
@@ -40,7 +52,6 @@ export async function GET(
   btn.style.background = ${JSON.stringify(connection.widgetBubbleColor || '#2563eb')};
 
   const frame = document.createElement('iframe');
-  frame.src = iframeUrl;
   frame.style.position = 'fixed';
   frame.style.right = '24px';
   frame.style.bottom = '92px';
@@ -53,9 +64,17 @@ export async function GET(
   frame.style.boxShadow = '0 20px 50px rgba(0,0,0,0.18)';
   frame.style.display = 'none';
   frame.style.zIndex = '2147483646';
+  let hasLoadedFrame = false;
 
   btn.onclick = function(){
-    frame.style.display = frame.style.display === 'none' ? 'block' : 'none';
+    const shouldOpen = frame.style.display === 'none';
+
+    if (shouldOpen && !hasLoadedFrame) {
+      frame.src = iframeUrl;
+      hasLoadedFrame = true;
+    }
+
+    frame.style.display = shouldOpen ? 'block' : 'none';
   };
 
   document.body.appendChild(frame);

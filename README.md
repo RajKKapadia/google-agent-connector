@@ -77,7 +77,7 @@ Then fill all values in `.env.local`.
 ### 4) Apply database schema
 
 ```bash
-pnpm db:push
+pnpm db:migrate
 ```
 
 ### 5) Run the app and worker
@@ -162,7 +162,8 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```bash
 pnpm db:generate   # Generate migration files
 pnpm db:migrate    # Apply migrations
-pnpm db:push       # Push schema directly (dev)
+pnpm db:push       # Push schema directly (local-only shortcut)
+pnpm db:repair:messages  # Remove duplicate WhatsApp message rows and restore the unique index
 pnpm db:studio     # Open Drizzle Studio
 ```
 
@@ -172,6 +173,12 @@ Use the production compose file:
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Before starting the app and worker against an existing database, run:
+
+```bash
+pnpm db:migrate
 ```
 
 Services:

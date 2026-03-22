@@ -3,22 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { connections, endUserSessions, messages } from "@/lib/db/schema";
 import { createCESClient } from "@/lib/ces/client";
-
-function getHostname(origin: string | null) {
-  if (!origin) return null;
-  try {
-    return new URL(origin).hostname;
-  } catch {
-    return null;
-  }
-}
-
-function isAllowedOrigin(origin: string | null, domain: string | null) {
-  if (!domain) return false;
-  const host = getHostname(origin);
-  if (!host) return false;
-  return host === domain || host.endsWith(`.${domain}`);
-}
+import { verifyWidgetAccessToken } from "@/lib/widget/security";
 
 export async function POST(
   req: NextRequest,
@@ -27,6 +12,7 @@ export async function POST(
   const { connectionId } = await params;
   const body = (await req.json()) as {
     key?: string;
+    token?: string;
     sessionId?: string;
     message?: string;
   };
@@ -39,12 +25,12 @@ export async function POST(
     return NextResponse.json({ error: "Connection not found" }, { status: 404 });
   }
 
-  if (!isAllowedOrigin(req.headers.get("origin"), connection.websiteDomain)) {
-    return NextResponse.json({ error: "Forbidden origin" }, { status: 403 });
-  }
-
   if (!body.key || body.key !== connection.widgetKey) {
     return NextResponse.json({ error: "Invalid widget key" }, { status: 403 });
+  }
+
+  if (!verifyWidgetAccessToken(body.token, connection.id, connection.widgetKey!)) {
+    return NextResponse.json({ error: "Invalid widget token" }, { status: 403 });
   }
 
   const messageText = body.message?.trim();

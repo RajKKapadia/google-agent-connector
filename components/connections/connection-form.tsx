@@ -214,12 +214,13 @@ export function ConnectionForm() {
                 name="websiteDomain"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Allowed Domain</FormLabel>
+                    <FormLabel>Allowed Site(s)</FormLabel>
                     <FormControl>
-                      <Input placeholder="example.com" {...field} />
+                      <Input placeholder="example.com, localhost:8000" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Only this domain can open widget API requests.
+                      Only these sites can load the widget. Separate multiple
+                      entries with commas.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

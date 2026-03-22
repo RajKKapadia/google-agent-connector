@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { WebhookUrlDisplay } from "@/components/dashboard/webhook-url-display";
 import { DeleteConnectionButton } from "@/components/connections/delete-connection-button";
+import { EmbedScriptCard } from "@/components/connections/embed-script-card";
 import { ArrowLeft, ExternalLink, Pencil } from "lucide-react";
 import { count } from "drizzle-orm";
 
@@ -78,13 +79,10 @@ export default async function ConnectionDetailPage({
       {connection.type === "whatsapp" ? (
         <WebhookUrlDisplay connectionId={connection.id} verifyToken={connection.whatsappVerifyToken} />
       ) : scriptTag ? (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Website Embed Script</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <p className="text-muted-foreground">Add this script before the closing <code>&lt;/body&gt;</code> tag on <span className="font-medium">{connection.websiteDomain}</span>.</p>
-            <pre className="rounded-md border bg-muted/30 p-3 text-xs overflow-x-auto"><code>{scriptTag}</code></pre>
-          </CardContent>
-        </Card>
+        <EmbedScriptCard
+          scriptTag={scriptTag}
+          websiteDomain={connection.websiteDomain}
+        />
       ) : null}
 
       <Card>
@@ -93,7 +91,7 @@ export default async function ConnectionDetailPage({
           <div className="grid grid-cols-2 gap-y-3">
             {connection.type === "website" ? (
               <>
-                <span className="text-muted-foreground">Allowed Domain</span>
+                <span className="text-muted-foreground">Allowed Site(s)</span>
                 <span className="font-mono">{connection.websiteDomain}</span>
                 <span className="text-muted-foreground">Bubble Color</span>
                 <span className="font-mono">{connection.widgetBubbleColor}</span>

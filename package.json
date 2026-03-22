@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "db:repair:messages": "node scripts/repair-whatsapp-message-index.mjs",
     "db:studio": "drizzle-kit studio",
     "lint": "eslint"
   },
