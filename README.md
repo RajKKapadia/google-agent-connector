@@ -133,7 +133,7 @@ pnpm db:studio
 ## Production Deployment
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml up -d --build --scale worker=2
 pnpm db:migrate
 ```
 
@@ -144,9 +144,24 @@ Services:
 - `postgres`
 - `redis`
 
+The production stack keeps `app` as a single replica and scales only the queue worker.
+
+Optional worker tuning in `.env.production`:
+
+- `WORKER_CONCURRENCY=5`
+- `WORKER_SESSION_LOCK_TTL_MS=120000`
+- `WORKER_SESSION_LOCK_WAIT_MS=30000`
+
+Guidance:
+
+- Increase `--scale worker=N` to process more independent conversations in parallel.
+- Increase `WORKER_CONCURRENCY` only when each worker instance still has headroom.
+- Messages for the same WhatsApp session are serialized with a Redis lock so scaled workers do not race each other.
+
 ## Security Notes
 
 - Admin auth uses a signed HTTP-only session cookie.
 - Sensitive channel and agent credentials are encrypted before storage.
 - WhatsApp webhook signatures are verified per channel.
 - Public widget and webhook endpoints remain unauthenticated by design.
+
