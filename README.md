@@ -14,16 +14,16 @@ CES Connector is a self-hosted admin console for routing WhatsApp and website wi
 
 ```text
 WhatsApp User / Website Visitor
-   │
-   ▼
+   |
+   v
 Channel endpoint (/api/webhooks/[connectionId] or /api/widget/[connectionId])
-   │ resolves mapped agent
-   ▼
+   | resolves mapped agent
+   v
 BullMQ Worker / direct widget execution
-   │ calls CES API, persists messages, publishes realtime updates
-   ▼
+   | calls CES API, persists messages, publishes realtime updates
+   v
 PostgreSQL + Redis pub/sub + SSE
-   ▼
+   v
 Admin Console (/dashboard, /channels, /agents, /mappings, /conversations)
 ```
 
@@ -37,6 +37,11 @@ Admin Console (/dashboard, /channels, /agents, /mappings, /conversations)
 - WhatsApp Cloud API
 - shadcn/ui + Tailwind CSS
 - Docker Compose deployment
+
+## Documentation
+
+- Local setup and production deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- License terms: [LICENSE](LICENSE)
 
 ## Prerequisites
 
@@ -132,31 +137,16 @@ pnpm db:studio
 
 ## Production Deployment
 
+Use the full guide in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The short version is:
+
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build --scale worker=2
-pnpm db:migrate
+cp .env.production.example .env.production
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml run --rm worker pnpm db:migrate
+docker compose -f docker-compose.prod.yml up -d --scale worker=2
 ```
 
-Services:
-
-- `app`
-- `worker`
-- `postgres`
-- `redis`
-
 The production stack keeps `app` as a single replica and scales only the queue worker.
-
-Optional worker tuning in `.env.production`:
-
-- `WORKER_CONCURRENCY=5`
-- `WORKER_SESSION_LOCK_TTL_MS=120000`
-- `WORKER_SESSION_LOCK_WAIT_MS=30000`
-
-Guidance:
-
-- Increase `--scale worker=N` to process more independent conversations in parallel.
-- Increase `WORKER_CONCURRENCY` only when each worker instance still has headroom.
-- Messages for the same WhatsApp session are serialized with a Redis lock so scaled workers do not race each other.
 
 ## Security Notes
 
@@ -165,3 +155,6 @@ Guidance:
 - WhatsApp webhook signatures are verified per channel.
 - Public widget and webhook endpoints remain unauthenticated by design.
 
+## License
+
+This repository is available under the PolyForm Noncommercial License 1.0.0. Individuals and organizations can use, study, and modify it for noncommercial purposes, but commercial use requires separate permission from the copyright holder.
