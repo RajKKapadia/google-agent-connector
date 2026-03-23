@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,19 +23,62 @@ interface HumanTakeoverControlsProps {
   sessionId: string;
   mode: "ai" | "human";
   excludeHumanMessages: boolean;
+  connectionType: "whatsapp" | "website";
+  initialWebsiteSessionActive: boolean | null;
 }
 
 export function HumanTakeoverControls({
   sessionId,
   mode,
   excludeHumanMessages,
+  connectionType,
+  initialWebsiteSessionActive,
 }: HumanTakeoverControlsProps) {
   const [currentMode, setCurrentMode] = useState(mode);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [excludeHistory, setExcludeHistory] = useState(excludeHumanMessages);
   const [messageText, setMessageText] = useState("");
+  const [websiteSessionActive, setWebsiteSessionActive] = useState(
+    initialWebsiteSessionActive ?? false
+  );
   const [isPending, startTransition] = useTransition();
   const [isSending, setIsSending] = useState(false);
+  const isWebsiteConnection = connectionType === "website";
+  const isWebsiteSendDisabled =
+    isWebsiteConnection && currentMode === "human" && !websiteSessionActive;
+
+  useEffect(() => {
+    if (!isWebsiteConnection) return;
+
+    let cancelled = false;
+
+    async function refreshPresence() {
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}/presence`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) return;
+
+        const data = (await response.json()) as { active?: boolean };
+        if (!cancelled && typeof data.active === "boolean") {
+          setWebsiteSessionActive(data.active);
+        }
+      } catch {
+        // Keep the last known presence value if polling fails.
+      }
+    }
+
+    void refreshPresence();
+    const intervalId = window.setInterval(() => {
+      void refreshPresence();
+    }, 15_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isWebsiteConnection, sessionId]);
 
   async function handleTakeOver() {
     startTransition(async () => {
@@ -63,6 +106,10 @@ export function HumanTakeoverControls({
   }
 
   async function handleSendMessage() {
+    if (isWebsiteSendDisabled) {
+      toast.error("Website session is inactive. Wait for the widget to reconnect.");
+      return;
+    }
     if (!messageText.trim()) return;
     setIsSending(true);
     try {
@@ -102,6 +149,18 @@ export function HumanTakeoverControls({
               Human Mode
             </Badge>
           )}
+          {isWebsiteConnection ? (
+            <Badge
+              variant="outline"
+              className={
+                websiteSessionActive
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-slate-100 text-slate-600"
+              }
+            >
+              {websiteSessionActive ? "Widget Active" : "Widget Inactive"}
+            </Badge>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           {currentMode === "ai" ? (
@@ -162,22 +221,32 @@ export function HumanTakeoverControls({
 
       {/* Human message input */}
       {currentMode === "human" && (
-        <div className="flex gap-2 p-3">
-          <Textarea
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
-            className="min-h-15 max-h-37.5 resize-none"
-            disabled={isSending}
-          />
-          <Button
-            onClick={handleSendMessage}
-            disabled={isSending || !messageText.trim()}
-            className="self-end"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+        <div className="p-3">
+          <div className="flex gap-2">
+            <Textarea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
+              className="min-h-15 max-h-37.5 resize-none"
+              disabled={isSending || isWebsiteSendDisabled}
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={
+                isSending || isWebsiteSendDisabled || !messageText.trim()
+              }
+              className="self-end"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+          {isWebsiteSendDisabled ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              User is offline. Wait for the website widget to reconnect before
+              sending a message.
+            </p>
+          ) : null}
         </div>
       )}
     </div>

@@ -6,8 +6,9 @@ import { revalidatePath } from "next/cache";
 import { eq, and, gte, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { endUserSessions, connections, messages } from "@/lib/db/schema";
-import { createWhatsAppClient } from "@/lib/whatsapp/client";
+import { createWhatsAppClient, WhatsAppApiError } from "@/lib/whatsapp/client";
 import { buildPendingCesContext } from "@/lib/sessions/ces";
+import { isWebsiteSessionActive } from "@/lib/sessions/presence";
 import { createMessageEvent, createModeEvent, publishSessionEvent } from "@/lib/sessions/realtime";
 import type { ActionResult } from "./connections";
 
@@ -111,9 +112,75 @@ export async function sendHumanAgentMessage(
     return { success: false, error: "Message cannot be empty" };
   }
 
+  const trimmedContent = content.trim();
+
   if (session.connection.type === "whatsapp") {
+    const latestInboundMessage = await db.query.messages.findFirst({
+      where: and(
+        eq(messages.sessionId, sessionId),
+        eq(messages.direction, "incoming"),
+        eq(messages.senderType, "user")
+      ),
+      orderBy: (t, { desc }) => [desc(t.timestamp)],
+      columns: {
+        whatsappMessageId: true,
+      },
+    });
+
     const waClient = createWhatsAppClient(session.connection);
-    await waClient.sendTextMessage({ to: session.waId, text: content.trim() });
+
+    try {
+      await waClient.sendTextMessage({
+        to: session.waId,
+        text: trimmedContent,
+        messageId: latestInboundMessage?.whatsappMessageId ?? undefined,
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to send WhatsApp message";
+
+      console.error("WhatsApp human send failed", {
+        sessionId,
+        connectionId: session.connection.id,
+        waId: session.waId,
+        error: errorMessage,
+        providerStatus: error instanceof WhatsAppApiError ? error.status : undefined,
+        providerCode: error instanceof WhatsAppApiError ? error.code : undefined,
+        providerSubcode:
+          error instanceof WhatsAppApiError ? error.subcode : undefined,
+        providerTraceId:
+          error instanceof WhatsAppApiError ? error.traceId : undefined,
+        providerBody: error instanceof WhatsAppApiError ? error.body : undefined,
+      });
+
+      return { success: false, error: errorMessage };
+    }
+  } else {
+    let websiteSessionActive = false;
+
+    try {
+      websiteSessionActive = await isWebsiteSessionActive(sessionId);
+    } catch (error) {
+      console.error("Failed to verify website session presence", {
+        sessionId,
+        connectionId: session.connection.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      return {
+        success: false,
+        error: "Failed to verify website session status. Please try again.",
+      };
+    }
+
+    if (!websiteSessionActive) {
+      return {
+        success: false,
+        error: "Website session is inactive. Wait for the widget to reconnect.",
+      };
+    }
   }
 
   // Insert message record
@@ -123,7 +190,7 @@ export async function sendHumanAgentMessage(
       sessionId,
       direction: "outgoing",
       senderType: "human_agent",
-      content: content.trim(),
+      content: trimmedContent,
       isHumanAgentMessage: true,
     })
     .returning();

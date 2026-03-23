@@ -9,6 +9,49 @@ interface SendTextMessageOptions {
   messageId?: string;
 }
 
+interface ParsedWhatsAppErrorBody {
+  error?: {
+    message?: string;
+    code?: number;
+    error_subcode?: number;
+    fbtrace_id?: string;
+  };
+}
+
+export class WhatsAppApiError extends Error {
+  status: number;
+  body: string;
+  code?: number;
+  subcode?: number;
+  traceId?: string;
+
+  constructor(options: {
+    status: number;
+    body: string;
+    message: string;
+    code?: number;
+    subcode?: number;
+    traceId?: string;
+  }) {
+    super(options.message);
+    this.name = "WhatsAppApiError";
+    this.status = options.status;
+    this.body = options.body;
+    this.code = options.code;
+    this.subcode = options.subcode;
+    this.traceId = options.traceId;
+  }
+}
+
+function parseWhatsAppErrorBody(body: string) {
+  try {
+    const parsed = JSON.parse(body) as ParsedWhatsAppErrorBody;
+    return parsed.error ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export class WhatsAppClient {
   private phoneNumberId: string;
   private accessToken: string;
@@ -50,9 +93,18 @@ export class WhatsAppClient {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `WhatsApp API error ${response.status}: ${errorText}`
-      );
+      const providerError = parseWhatsAppErrorBody(errorText);
+
+      throw new WhatsAppApiError({
+        status: response.status,
+        body: errorText,
+        message: providerError?.message
+          ? `WhatsApp API error ${response.status}: ${providerError.message}`
+          : `WhatsApp API error ${response.status}: ${errorText}`,
+        code: providerError?.code,
+        subcode: providerError?.error_subcode,
+        traceId: providerError?.fbtrace_id,
+      });
     }
   }
 
