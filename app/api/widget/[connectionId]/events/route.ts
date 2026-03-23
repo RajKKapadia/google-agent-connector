@@ -3,6 +3,10 @@ import IORedis from "ioredis";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { connections, endUserSessions } from "@/lib/db/schema";
+import {
+  touchWebsiteSessionPresence,
+  WEBSITE_SESSION_PRESENCE_REFRESH_INTERVAL_MS,
+} from "@/lib/sessions/presence";
 import { createModeEvent } from "@/lib/sessions/realtime";
 import { verifyWidgetAccessToken } from "@/lib/widget/security";
 
@@ -45,6 +49,8 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
+  const activeSession = session;
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -52,17 +58,35 @@ export async function GET(
       const sub = new IORedis(process.env.REDIS_URL!, {
         maxRetriesPerRequest: null,
       });
+      const presence = new IORedis(process.env.REDIS_URL!, {
+        maxRetriesPerRequest: null,
+      });
+
+      async function refreshPresence() {
+        try {
+          await touchWebsiteSessionPresence(presence, activeSession.id);
+        } catch (error) {
+          console.error("Failed to refresh website session presence", {
+            sessionId: activeSession.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
       try {
+        await refreshPresence();
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(createModeEvent(session.mode))}\n\n`)
+          encoder.encode(
+            `data: ${JSON.stringify(createModeEvent(activeSession.mode))}\n\n`
+          )
         );
       } catch {
+        presence.quit().catch(() => {});
         await sub.quit().catch(() => {});
         return;
       }
 
-      await sub.subscribe(`session:${session.id}`);
+      await sub.subscribe(`session:${activeSession.id}`);
 
       sub.on("message", (_channel, data) => {
         try {
@@ -79,11 +103,16 @@ export async function GET(
           clearInterval(heartbeatInterval);
         }
       }, 30000);
+      const presenceInterval = setInterval(() => {
+        void refreshPresence();
+      }, WEBSITE_SESSION_PRESENCE_REFRESH_INTERVAL_MS);
 
       req.signal.addEventListener("abort", () => {
         clearInterval(heartbeatInterval);
+        clearInterval(presenceInterval);
         sub.unsubscribe().catch(() => {});
         sub.quit().catch(() => {});
+        presence.quit().catch(() => {});
         try {
           controller.close();
         } catch {

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { connections, endUserSessions } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getWebsiteSessionPresenceMap } from "@/lib/sessions/presence";
 import {
   Table,
   TableBody,
@@ -81,7 +82,7 @@ export default async function SessionsPage({
   const sessions = await db.query.endUserSessions.findMany({
     where: inArray(endUserSessions.connectionId, scopedConnectionIds),
     with: {
-      connection: { columns: { name: true, id: true } },
+      connection: { columns: { name: true, id: true, type: true } },
       messages: {
         orderBy: (m, { desc }) => [desc(m.timestamp)],
         limit: 1,
@@ -90,6 +91,12 @@ export default async function SessionsPage({
     orderBy: (t, { desc }) => [desc(t.lastActivityAt)],
     limit: 100,
   });
+
+  const websiteSessionPresence = await getWebsiteSessionPresenceMap(
+    sessions
+      .filter((session) => session.connection.type === "website")
+      .map((session) => session.id)
+  );
 
   return (
     <div>
@@ -109,8 +116,8 @@ export default async function SessionsPage({
         <div className="border rounded-lg p-12 text-center">
           <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">
-            No sessions yet. Send a WhatsApp message to your connected number to
-            start a conversation.
+            No sessions yet. Start a conversation from one of your connected
+            channels to see it here.
           </p>
         </div>
       ) : (
@@ -120,6 +127,10 @@ export default async function SessionsPage({
             {sessions.map((session) => {
               const lastMessage = session.messages[0];
               const hasUnread = lastMessage?.direction === "incoming";
+              const websiteSessionActive =
+                session.connection.type !== "website"
+                  ? null
+                  : websiteSessionPresence.get(session.id) ?? false;
 
               return (
                 <Link
@@ -152,6 +163,18 @@ export default async function SessionsPage({
                           Human
                         </Badge>
                       )}
+                      {websiteSessionActive !== null ? (
+                        <Badge
+                          variant="outline"
+                          className={
+                            websiteSessionActive
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 shrink-0"
+                              : "border-slate-200 bg-slate-100 text-slate-600 shrink-0"
+                          }
+                        >
+                          {websiteSessionActive ? "Active" : "Inactive"}
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {session.connection.name}
@@ -172,9 +195,10 @@ export default async function SessionsPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>WhatsApp User</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>Connection</TableHead>
                   <TableHead>Mode</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Last Activity</TableHead>
                   <TableHead className="w-20" />
                 </TableRow>
@@ -183,6 +207,10 @@ export default async function SessionsPage({
                 {sessions.map((session) => {
                   const lastMessage = session.messages[0];
                   const hasUnread = lastMessage?.direction === "incoming";
+                  const websiteSessionActive =
+                    session.connection.type !== "website"
+                      ? null
+                      : websiteSessionPresence.get(session.id) ?? false;
 
                   return (
                     <TableRow key={session.id}>
@@ -211,6 +239,22 @@ export default async function SessionsPage({
                             <User className="h-3 w-3 mr-1" />
                             Human
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {websiteSessionActive !== null ? (
+                          <Badge
+                            variant="outline"
+                            className={
+                              websiteSessionActive
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-slate-200 bg-slate-100 text-slate-600"
+                            }
+                          >
+                            {websiteSessionActive ? "Active" : "Inactive"}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">

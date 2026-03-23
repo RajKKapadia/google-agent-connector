@@ -79,7 +79,7 @@ export function ChatView({
     <div className="flex flex-col gap-3 p-4 overflow-y-auto flex-1">
       {msgs.length === 0 && (
         <div className="text-center text-muted-foreground text-sm py-8">
-          No messages yet. Waiting for the user to send a message on WhatsApp.
+          No messages yet. Waiting for the user to send a message.
         </div>
       )}
       {msgs.map((msg) => (

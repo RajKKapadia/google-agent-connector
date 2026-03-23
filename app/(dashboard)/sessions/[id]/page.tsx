@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { endUserSessions, messages } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
+import { isWebsiteSessionActive } from "@/lib/sessions/presence";
 import { ArrowLeft } from "lucide-react";
 import { ChatView } from "@/components/chat/chat-view";
 import { HumanTakeoverControls } from "@/components/chat/human-takeover-controls";
@@ -34,6 +35,10 @@ export default async function SessionDetailPage({
     ...m,
     timestamp: m.timestamp.toISOString(),
   }));
+  const initialWebsiteSessionActive =
+    session.connection.type === "website"
+      ? await isWebsiteSessionActive(session.id)
+      : null;
 
   return (
     <div className="flex flex-col h-full -m-6">
@@ -69,6 +74,8 @@ export default async function SessionDetailPage({
         sessionId={session.id}
         mode={session.mode}
         excludeHumanMessages={session.excludeHumanMessagesFromHistory}
+        connectionType={session.connection.type}
+        initialWebsiteSessionActive={initialWebsiteSessionActive}
       />
     </div>
   );
