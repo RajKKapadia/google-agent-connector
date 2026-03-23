@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "dev:worker": "tsx --env-file=.env.local --watch worker/index.ts",
+    "dev:worker": "tsx --env-file=.env --watch worker/index.ts",
     "dev:all": "concurrently \"pnpm dev\" \"pnpm dev:worker\"",
     "build": "next build",
     "start": "next start",
-    "worker:start": "node --env-file=.env.local --import=tsx/esm worker/index.ts",
+    "worker:start": "node --env-file=.env --import=tsx/esm worker/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -17,7 +17,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.38.0",
     "@hookform/resolvers": "^5.2.2",
     "bullmq": "^5.69.3",
     "class-variance-authority": "^0.7.1",
@@ -36,7 +35,6 @@
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
     "sonner": "^2.0.7",
-    "stripe": "^20.3.1",
     "tailwind-merge": "^3.5.0",
     "zod": "^3.25.76"
   },

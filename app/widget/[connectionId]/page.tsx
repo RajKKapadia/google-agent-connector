@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { connections } from "@/lib/db/schema";
+import { channels } from "@/lib/db/schema";
 import { WidgetChatClient } from "@/components/widget/widget-chat-client";
 import {
   createWidgetAccessToken,
@@ -21,34 +21,29 @@ export default async function WidgetPage({
   const { key, origin } = await searchParams;
   const requestHeaders = await headers();
 
-  const connection = await db.query.connections.findFirst({
-    where: and(eq(connections.id, connectionId), eq(connections.isActive, true)),
+  const channel = await db.query.channels.findFirst({
+    where: and(eq(channels.id, connectionId), eq(channels.isActive, true)),
   });
 
-  if (!connection || connection.type !== "website" || !key || key !== connection.widgetKey) {
+  if (!channel || channel.type !== "website" || !key || key !== channel.widgetKey) {
     notFound();
   }
 
-  if (
-    !isAllowedWidgetSite(
-      getWidgetEmbedSource(requestHeaders),
-      connection.websiteDomain
-    )
-  ) {
+  if (!isAllowedWidgetSite(getWidgetEmbedSource(requestHeaders), channel.websiteDomain)) {
     notFound();
   }
 
-  const widgetToken = createWidgetAccessToken(connection.id, connection.widgetKey!);
+  const widgetToken = createWidgetAccessToken(channel.id, channel.widgetKey!);
 
   return (
     <WidgetChatClient
-      connectionId={connection.id}
-      widgetKey={connection.widgetKey!}
+      connectionId={channel.id}
+      widgetKey={channel.widgetKey!}
       widgetToken={widgetToken}
-      widgetTitle={connection.widgetTitle || connection.name}
+      widgetTitle={channel.widgetTitle || channel.name}
       parentOrigin={origin ?? null}
-      fontFamily={connection.widgetFontFamily || "Inter, system-ui, sans-serif"}
-      bubbleColor={connection.widgetBubbleColor || "#2563eb"}
+      fontFamily={channel.widgetFontFamily || "system-ui, sans-serif"}
+      bubbleColor={channel.widgetBubbleColor || "#2563eb"}
     />
   );
 }

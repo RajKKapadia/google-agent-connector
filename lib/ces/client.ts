@@ -1,7 +1,6 @@
 import { GoogleAuth, JWT } from "google-auth-library";
 import { decrypt } from "@/lib/encryption";
 
-// Response shape for POST :runSession (v1beta)
 interface CESRunSessionResponse {
   outputs?: Array<{
     text?: string;
@@ -17,19 +16,14 @@ interface CESRunSessionResponse {
   [key: string]: unknown;
 }
 
-/**
- * Builds the runSession URL from the app version full path.
- *
- * cesAppVersion: "projects/P/locations/L/apps/A/versions/V"
- * → "https://ces.googleapis.com/v1beta/projects/P/locations/L/apps/A/sessions/{sessionId}:runSession"
- */
 function buildRunSessionUrl(cesAppVersion: string, sessionId: string): string {
   const versionIdx = cesAppVersion.lastIndexOf("/versions/");
   if (versionIdx === -1) {
     throw new Error(
-      `Invalid cesAppVersion — expected ".../versions/...": ${cesAppVersion}`
+      `Invalid cesAppVersion - expected ".../versions/...": ${cesAppVersion}`
     );
   }
+
   const appPath = cesAppVersion.slice(0, versionIdx);
   return `https://ces.googleapis.com/v1beta/${appPath}/sessions/${sessionId}:runSession`;
 }
@@ -69,7 +63,6 @@ export class CESClient {
   ): Promise<CESRunSessionResponse> {
     const accessToken = await this.getAccessToken();
     const url = buildRunSessionUrl(this.cesAppVersion, cesSessionId);
-
     const versionIdx = this.cesAppVersion.lastIndexOf("/versions/");
     const appPath = this.cesAppVersion.slice(0, versionIdx);
     const sessionResourceName = `${appPath}/sessions/${cesSessionId}`;
@@ -78,6 +71,7 @@ export class CESClient {
       session: sessionResourceName,
       app_version: this.cesAppVersion,
     };
+
     if (this.cesDeployment) {
       config.deployment = this.cesDeployment;
     }
@@ -101,9 +95,7 @@ export class CESClient {
       throw new Error(`CES API error ${response.status}: ${errorText}`);
     }
 
-    const data = (await response.json()) as CESRunSessionResponse;
-    console.log("[CES] Raw response:", JSON.stringify(data, null, 2));
-    return data;
+    return (await response.json()) as CESRunSessionResponse;
   }
 
   extractTextResponse(response: CESRunSessionResponse): string {
@@ -115,15 +107,10 @@ export class CESClient {
       }
     }
 
-    for (const msg of response.queryResult?.responseMessages ?? []) {
-      if (msg.text?.text) texts.push(...msg.text.text);
-    }
-
-    if (texts.length === 0) {
-      console.warn(
-        "[CES] Could not extract text from response:",
-        JSON.stringify(response)
-      );
+    for (const message of response.queryResult?.responseMessages ?? []) {
+      if (message.text?.text) {
+        texts.push(...message.text.text);
+      }
     }
 
     return (
@@ -133,14 +120,14 @@ export class CESClient {
   }
 }
 
-export function createCESClient(connection: {
+export function createCESClient(agent: {
   cesAppVersion: string;
   cesDeployment?: string | null;
-  googleAccessToken: string; // stores encrypted service account JSON
+  googleServiceAccount: string;
 }): CESClient {
   return new CESClient({
-    cesAppVersion: connection.cesAppVersion,
-    cesDeployment: connection.cesDeployment,
-    serviceAccountJsonEncrypted: connection.googleAccessToken,
+    cesAppVersion: agent.cesAppVersion,
+    cesDeployment: agent.cesDeployment,
+    serviceAccountJsonEncrypted: agent.googleServiceAccount,
   });
 }

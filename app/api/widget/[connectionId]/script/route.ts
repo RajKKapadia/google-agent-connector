@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { connections } from "@/lib/db/schema";
+import { channels } from "@/lib/db/schema";
 import { getWidgetEmbedSource, isAllowedWidgetSite } from "@/lib/widget/security";
 
 export async function GET(
@@ -11,22 +11,17 @@ export async function GET(
   const { connectionId } = await params;
   const key = req.nextUrl.searchParams.get("key");
 
-  const connection = await db.query.connections.findFirst({
-    where: and(eq(connections.id, connectionId), eq(connections.isActive, true)),
+  const channel = await db.query.channels.findFirst({
+    where: and(eq(channels.id, connectionId), eq(channels.isActive, true)),
   });
 
-  if (!connection || connection.type !== "website" || !key || key !== connection.widgetKey) {
+  if (!channel || channel.type !== "website" || !key || key !== channel.widgetKey) {
     return new Response("console.error('Invalid widget config');", {
       headers: { "content-type": "application/javascript" },
     });
   }
 
-  if (
-    !isAllowedWidgetSite(
-      getWidgetEmbedSource(req.headers),
-      connection.websiteDomain
-    )
-  ) {
+  if (!isAllowedWidgetSite(getWidgetEmbedSource(req.headers), channel.websiteDomain)) {
     return new Response("console.error('Widget is not allowed on this site');", {
       headers: { "content-type": "application/javascript" },
     });
@@ -51,7 +46,7 @@ export async function GET(
   btn.style.color = '#fff';
   btn.style.fontWeight = '600';
   btn.style.zIndex = '2147483646';
-  btn.style.background = ${JSON.stringify(connection.widgetBubbleColor || '#2563eb')};
+  btn.style.background = ${JSON.stringify(channel.widgetBubbleColor || '#2563eb')};
 
   const frame = document.createElement('iframe');
   frame.style.position = 'fixed';

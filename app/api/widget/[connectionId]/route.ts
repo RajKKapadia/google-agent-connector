@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { connections, endUserSessions, messages } from "@/lib/db/schema";
+import { channels, endUserSessions, messages } from "@/lib/db/schema";
 import { createCESClient } from "@/lib/ces/client";
 import { buildCesInput } from "@/lib/sessions/ces";
 import {
@@ -23,20 +23,28 @@ export async function POST(
     message?: string;
   };
 
-  const connection = await db.query.connections.findFirst({
-    where: and(eq(connections.id, connectionId), eq(connections.isActive, true)),
+  const channel = await db.query.channels.findFirst({
+    where: and(eq(channels.id, connectionId), eq(channels.isActive, true)),
+    with: { agent: true },
   });
 
-  if (!connection || connection.type !== "website") {
-    return NextResponse.json({ error: "Connection not found" }, { status: 404 });
+  if (!channel || channel.type !== "website") {
+    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
 
-  if (!body.key || body.key !== connection.widgetKey) {
+  if (!body.key || body.key !== channel.widgetKey) {
     return NextResponse.json({ error: "Invalid widget key" }, { status: 403 });
   }
 
-  if (!verifyWidgetAccessToken(body.token, connection.id, connection.widgetKey!)) {
+  if (!verifyWidgetAccessToken(body.token, channel.id, channel.widgetKey!)) {
     return NextResponse.json({ error: "Invalid widget token" }, { status: 403 });
+  }
+
+  if (!channel.agent) {
+    return NextResponse.json(
+      { error: "Channel is not mapped to an agent" },
+      { status: 409 }
+    );
   }
 
   const messageText = body.message?.trim();
@@ -49,7 +57,7 @@ export async function POST(
 
   let session = await db.query.endUserSessions.findFirst({
     where: and(
-      eq(endUserSessions.connectionId, connectionId),
+      eq(endUserSessions.channelId, connectionId),
       eq(endUserSessions.waId, waId)
     ),
   });
@@ -57,9 +65,9 @@ export async function POST(
   if (!session) {
     const [created] = await db
       .insert(endUserSessions)
-      .values({ connectionId, waId })
+      .values({ channelId: connectionId, waId })
       .onConflictDoNothing({
-        target: [endUserSessions.connectionId, endUserSessions.waId],
+        target: [endUserSessions.channelId, endUserSessions.waId],
       })
       .returning();
 
@@ -68,7 +76,7 @@ export async function POST(
     } else {
       session = await db.query.endUserSessions.findFirst({
         where: and(
-          eq(endUserSessions.connectionId, connectionId),
+          eq(endUserSessions.channelId, connectionId),
           eq(endUserSessions.waId, waId)
         ),
       });
@@ -113,7 +121,7 @@ export async function POST(
     });
   }
 
-  const cesClient = createCESClient(connection);
+  const cesClient = createCESClient(channel.agent);
   const cesResponse = await cesClient.runSession(
     session.cesSessionId,
     buildCesInput(messageText, session.pendingCesContext)

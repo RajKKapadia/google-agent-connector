@@ -1,12 +1,10 @@
 import type { Metadata } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CES Connector",
-  description:
-    "Connect WhatsApp to Google Customer Engagement Suite AI agents",
+  title: "CES Connector Admin",
+  description: "Self-hosted admin console for CES channels and conversations",
 };
 
 export default function RootLayout({
@@ -15,13 +13,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className="antialiased">
-          {children}
-          <Toaster />
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className="antialiased bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.10),transparent_35%),linear-gradient(180deg,#ffffff,#f8fafc)] text-foreground">
+        {children}
+        <Toaster />
+      </body>
+    </html>
   );
 }

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import IORedis from "ioredis";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { connections, endUserSessions } from "@/lib/db/schema";
+import { channels, endUserSessions } from "@/lib/db/schema";
 import {
   touchWebsiteSessionPresence,
   WEBSITE_SESSION_PRESENCE_REFRESH_INTERVAL_MS,
@@ -26,21 +26,21 @@ export async function GET(
     return new Response("Bad request", { status: 400 });
   }
 
-  const connection = await db.query.connections.findFirst({
-    where: and(eq(connections.id, connectionId), eq(connections.isActive, true)),
+  const channel = await db.query.channels.findFirst({
+    where: and(eq(channels.id, connectionId), eq(channels.isActive, true)),
   });
 
-  if (!connection || connection.type !== "website" || key !== connection.widgetKey) {
+  if (!channel || channel.type !== "website" || key !== channel.widgetKey) {
     return new Response("Not found", { status: 404 });
   }
 
-  if (!verifyWidgetAccessToken(token, connection.id, connection.widgetKey!)) {
+  if (!verifyWidgetAccessToken(token, channel.id, channel.widgetKey!)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
   const session = await db.query.endUserSessions.findFirst({
     where: and(
-      eq(endUserSessions.connectionId, connection.id),
+      eq(endUserSessions.channelId, channel.id),
       eq(endUserSessions.waId, `web:${browserSessionId}`)
     ),
   });
@@ -50,7 +50,6 @@ export async function GET(
   }
 
   const activeSession = session;
-
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
