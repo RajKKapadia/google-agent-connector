@@ -1,6 +1,5 @@
 import { config } from "dotenv";
-config({ path: ".env.local" });
-config(); // fallback to .env
+config();
 import { createMessageWorker } from "@/lib/queue/worker";
 
 console.log("[Worker] Starting CES Connector worker...");

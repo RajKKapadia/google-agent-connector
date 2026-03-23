@@ -1,28 +1,21 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, and, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { endUserSessions, connections, messages } from "@/lib/db/schema";
+import { endUserSessions, channels, messages } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth/session";
 import { createWhatsAppClient, WhatsAppApiError } from "@/lib/whatsapp/client";
 import { buildPendingCesContext } from "@/lib/sessions/ces";
 import { isWebsiteSessionActive } from "@/lib/sessions/presence";
 import { createMessageEvent, createModeEvent, publishSessionEvent } from "@/lib/sessions/realtime";
-import type { ActionResult } from "./connections";
+import type { ActionResult } from "./types";
 
-async function verifySessionOwnership(sessionId: string, userId: string) {
-  const session = await db.query.endUserSessions.findFirst({
+async function verifySessionExists(sessionId: string) {
+  return db.query.endUserSessions.findFirst({
     where: eq(endUserSessions.id, sessionId),
-    with: { connection: true },
+    with: { channel: true },
   });
-
-  if (!session || session.connection.userId !== userId) {
-    return null;
-  }
-
-  return session;
 }
 
 export async function setSessionMode(
@@ -30,12 +23,11 @@ export async function setSessionMode(
   mode: "ai" | "human",
   excludeHumanMessages?: boolean
 ): Promise<ActionResult> {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  await requireAdmin();
 
-  const session = await verifySessionOwnership(sessionId, userId);
+  const session = await verifySessionExists(sessionId);
   if (!session) {
-    return { success: false, error: "Session not found" };
+    return { success: false, error: "Conversation not found" };
   }
 
   const updateData: Record<string, unknown> = {
@@ -83,7 +75,7 @@ export async function setSessionMode(
     .where(eq(endUserSessions.id, sessionId));
 
   await publishSessionEvent(sessionId, createModeEvent(mode));
-  revalidatePath(`/sessions/${sessionId}`);
+  revalidatePath(`/conversations/${sessionId}`);
 
   return { success: true };
 }
@@ -92,19 +84,18 @@ export async function sendHumanAgentMessage(
   sessionId: string,
   content: string
 ): Promise<ActionResult<{ messageId: string }>> {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  await requireAdmin();
 
-  const session = await verifySessionOwnership(sessionId, userId);
+  const session = await verifySessionExists(sessionId);
   if (!session) {
-    return { success: false, error: "Session not found" };
+    return { success: false, error: "Conversation not found" };
   }
 
   if (session.mode !== "human") {
     return {
       success: false,
       error:
-        "Session is not in human mode. Take over the session before sending messages.",
+        "Conversation is not in human mode. Take over the conversation before sending messages.",
     };
   }
 
@@ -114,7 +105,7 @@ export async function sendHumanAgentMessage(
 
   const trimmedContent = content.trim();
 
-  if (session.connection.type === "whatsapp") {
+  if (session.channel.type === "whatsapp") {
     const latestInboundMessage = await db.query.messages.findFirst({
       where: and(
         eq(messages.sessionId, sessionId),
@@ -127,7 +118,7 @@ export async function sendHumanAgentMessage(
       },
     });
 
-    const waClient = createWhatsAppClient(session.connection);
+    const waClient = createWhatsAppClient(session.channel);
 
     try {
       await waClient.sendTextMessage({
@@ -143,7 +134,7 @@ export async function sendHumanAgentMessage(
 
       console.error("WhatsApp human send failed", {
         sessionId,
-        connectionId: session.connection.id,
+        channelId: session.channel.id,
         waId: session.waId,
         error: errorMessage,
         providerStatus: error instanceof WhatsAppApiError ? error.status : undefined,
@@ -165,7 +156,7 @@ export async function sendHumanAgentMessage(
     } catch (error) {
       console.error("Failed to verify website session presence", {
         sessionId,
-        connectionId: session.connection.id,
+        channelId: session.channel.id,
         error: error instanceof Error ? error.message : String(error),
       });
 
@@ -183,7 +174,6 @@ export async function sendHumanAgentMessage(
     }
   }
 
-  // Insert message record
   const [newMessage] = await db
     .insert(messages)
     .values({
@@ -195,7 +185,6 @@ export async function sendHumanAgentMessage(
     })
     .returning();
 
-  // Update lastActivityAt
   await db
     .update(endUserSessions)
     .set({ lastActivityAt: new Date(), updatedAt: new Date() })
@@ -207,10 +196,9 @@ export async function sendHumanAgentMessage(
 }
 
 export async function getSessionWithMessages(sessionId: string) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  await requireAdmin();
 
-  const session = await verifySessionOwnership(sessionId, userId);
+  const session = await verifySessionExists(sessionId);
   if (!session) return null;
 
   const sessionMessages = await db.query.messages.findMany({
@@ -221,29 +209,26 @@ export async function getSessionWithMessages(sessionId: string) {
   return { session, messages: sessionMessages };
 }
 
-export async function getUserSessions(connectionId?: string) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+export async function getUserSessions(channelId?: string) {
+  await requireAdmin();
 
-  // Get all connections for user
-  const userConnections = await db.query.connections.findMany({
-    where: and(eq(connections.userId, userId), eq(connections.isActive, true)),
+  const activeChannels = await db.query.channels.findMany({
+    where: eq(channels.isActive, true),
     columns: { id: true },
   });
 
-  const connectionIds = userConnections.map((c) => c.id);
+  const channelIds = activeChannels.map((channel) => channel.id);
+  if (channelIds.length === 0) return [];
 
-  if (connectionIds.length === 0) return [];
+  const scopedChannelIds = channelId
+    ? channelIds.filter((id) => id === channelId)
+    : channelIds;
 
-  const scopedConnectionIds = connectionId
-    ? connectionIds.filter((id) => id === connectionId)
-    : connectionIds;
-
-  if (scopedConnectionIds.length === 0) return [];
+  if (scopedChannelIds.length === 0) return [];
 
   return db.query.endUserSessions.findMany({
-    where: inArray(endUserSessions.connectionId, scopedConnectionIds),
-    with: { connection: { columns: { name: true, id: true } } },
+    where: inArray(endUserSessions.channelId, scopedChannelIds),
+    with: { channel: { columns: { name: true, id: true } } },
     orderBy: (t, { desc }) => [desc(t.lastActivityAt)],
   });
 }

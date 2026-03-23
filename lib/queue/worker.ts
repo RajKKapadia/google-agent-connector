@@ -1,11 +1,7 @@
 import { Worker, Job } from "bullmq";
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import {
-  connections,
-  endUserSessions,
-  messages,
-} from "@/lib/db/schema";
+import { channels, endUserSessions, messages } from "@/lib/db/schema";
 import { createCESClient } from "@/lib/ces/client";
 import { createWhatsAppClient } from "@/lib/whatsapp/client";
 import { buildCesInput } from "@/lib/sessions/ces";
@@ -13,37 +9,34 @@ import { createMessageEvent, publishSessionEvent } from "@/lib/sessions/realtime
 import type { MessageJobData } from "./index";
 
 export async function processMessage(job: Job<MessageJobData>): Promise<void> {
-  const { connectionId, waId, messageText, messageId } = job.data;
+  const { channelId, waId, messageText, messageId } = job.data;
 
-  // 1. Load connection
-  const connection = await db.query.connections.findFirst({
-    where: and(
-      eq(connections.id, connectionId),
-      eq(connections.isActive, true)
-    ),
+  const channel = await db.query.channels.findFirst({
+    where: and(eq(channels.id, channelId), eq(channels.isActive, true)),
+    with: { agent: true },
   });
 
-  if (!connection) {
-    throw new Error(`Connection ${connectionId} not found or inactive`);
+  if (!channel) {
+    throw new Error(`Channel ${channelId} not found or inactive`);
   }
 
-  // 2. Get or create end user session
+  if (!channel.agent) {
+    throw new Error(`Channel ${channelId} is not mapped to an agent`);
+  }
+
   let session = await db.query.endUserSessions.findFirst({
-    where: and(
-      eq(endUserSessions.connectionId, connectionId),
-      eq(endUserSessions.waId, waId)
-    ),
+    where: and(eq(endUserSessions.channelId, channelId), eq(endUserSessions.waId, waId)),
   });
 
   if (!session) {
     const [newSession] = await db
       .insert(endUserSessions)
       .values({
-        connectionId,
+        channelId,
         waId,
       })
       .onConflictDoNothing({
-        target: [endUserSessions.connectionId, endUserSessions.waId],
+        target: [endUserSessions.channelId, endUserSessions.waId],
       })
       .returning();
 
@@ -51,19 +44,15 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
       session = newSession;
     } else {
       session = await db.query.endUserSessions.findFirst({
-        where: and(
-          eq(endUserSessions.connectionId, connectionId),
-          eq(endUserSessions.waId, waId)
-        ),
+        where: and(eq(endUserSessions.channelId, channelId), eq(endUserSessions.waId, waId)),
       });
     }
   }
 
   if (!session) {
-    throw new Error(`Failed to create session for ${connectionId}/${waId}`);
+    throw new Error(`Failed to create session for ${channelId}/${waId}`);
   }
 
-  // 3. Insert incoming message
   const [insertedIncomingMessage] = await db
     .insert(messages)
     .values({
@@ -87,20 +76,15 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
     throw new Error(`Failed to load inbound message ${messageId}`);
   }
 
-  // 4. Update session lastActivityAt
   if (insertedIncomingMessage) {
     await db
       .update(endUserSessions)
       .set({ lastActivityAt: new Date(), updatedAt: new Date() })
       .where(eq(endUserSessions.id, session.id));
-  }
 
-  // 5. Publish incoming message event
-  if (insertedIncomingMessage) {
     await publishSessionEvent(session.id, createMessageEvent(incomingMessage));
   }
 
-  // 6. If mode is 'human', stop here — no CES call
   if (session.mode === "human") {
     if (!incomingMessage.aiHandledAt) {
       await db
@@ -115,19 +99,16 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
     return;
   }
 
-  // 7. Call CES API
-  const cesClient = createCESClient(connection);
+  const cesClient = createCESClient(channel.agent);
   const cesResponse = await cesClient.runSession(
     session.cesSessionId,
     buildCesInput(messageText, session.pendingCesContext)
   );
   const responseText = cesClient.extractTextResponse(cesResponse);
 
-  // 8. Send WhatsApp reply
-  const waClient = createWhatsAppClient(connection);
+  const waClient = createWhatsAppClient(channel);
   await waClient.sendTextMessage({ to: waId, text: responseText });
 
-  // 9. Insert outgoing AI message
   const [outgoingMessage] = await db
     .insert(messages)
     .values({
@@ -151,7 +132,6 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
       .where(eq(endUserSessions.id, session.id));
   }
 
-  // 10. Publish outgoing message event
   await publishSessionEvent(session.id, createMessageEvent(outgoingMessage));
 }
 

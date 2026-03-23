@@ -1,9 +1,5 @@
-import { SignIn } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
 
-export default function SignInPage() {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <SignIn />
-    </div>
-  );
+export default function SignInRedirectPage() {
+  redirect("/login");
 }

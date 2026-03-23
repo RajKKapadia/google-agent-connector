@@ -1,35 +1,45 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { logoutAdmin } from "@/lib/actions/auth";
+import { hasAdminUser, requireAdmin } from "@/lib/auth/session";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  if (!(await hasAdminUser())) {
+    redirect("/setup");
+  }
+
+  const admin = await requireAdmin();
 
   return (
     <TooltipProvider>
       <div className="flex h-screen overflow-hidden">
-        {/* Desktop sidebar */}
         <div className="hidden lg:flex">
           <AppSidebar />
         </div>
-
-        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
-          <header className="h-14 flex items-center px-4 border-b shrink-0 bg-background gap-3">
-            {/* Mobile hamburger — hidden on lg+ */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur shrink-0">
             <MobileNav />
-            {/* Spacer pushes UserButton to the right */}
+            <div>
+              <p className="text-sm font-medium">{admin.name}</p>
+              <p className="text-xs text-muted-foreground">{admin.email}</p>
+            </div>
             <div className="flex-1" />
-            <UserButton />
+            <form action={logoutAdmin}>
+              <Button variant="outline" size="sm" type="submit">
+                Logout
+              </Button>
+            </form>
           </header>
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-muted/20">
+          <main className="flex-1 overflow-y-auto bg-muted/20 p-4 sm:p-6">
             {children}
           </main>
         </div>

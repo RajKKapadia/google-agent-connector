@@ -1,24 +1,15 @@
 import {
-  pgTable,
-  uuid,
-  text,
   boolean,
-  timestamp,
-  pgEnum,
-  uniqueIndex,
   index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
-// Enums
-export const planEnum = pgEnum("plan", ["starter", "business", "enterprise"]);
-export const subscriptionStatusEnum = pgEnum("subscription_status", [
-  "active",
-  "canceled",
-  "past_due",
-  "trialing",
-  "incomplete",
-]);
 export const sessionModeEnum = pgEnum("session_mode", ["ai", "human"]);
 export const messageDirectionEnum = pgEnum("message_direction", [
   "incoming",
@@ -29,64 +20,80 @@ export const senderTypeEnum = pgEnum("sender_type", [
   "ai",
   "human_agent",
 ]);
-export const connectionTypeEnum = pgEnum("connection_type", [
-  "whatsapp",
-  "website",
-]);
+export const channelTypeEnum = pgEnum("channel_type", ["whatsapp", "website"]);
 
-// Subscriptions table — one per Clerk userId
-export const subscriptions = pgTable("subscriptions", {
+export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").unique().notNull(),
-  stripeCustomerId: text("stripe_customer_id").unique(),
-  stripeSubscriptionId: text("stripe_subscription_id").unique(),
-  stripePriceId: text("stripe_price_id"),
-  plan: planEnum("plan").default("starter"),
-  status: subscriptionStatusEnum("status"),
-  currentPeriodStart: timestamp("current_period_start"),
-  currentPeriodEnd: timestamp("current_period_end"),
-  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Connections table — link a WhatsApp number to a CES agent
-export const connections = pgTable("connections", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull(),
   name: text("name").notNull(),
-  type: connectionTypeEnum("type").default("whatsapp").notNull(),
-  isActive: boolean("is_active").default(true).notNull(),
-  // WhatsApp / Meta fields
-  whatsappAppId: text("whatsapp_app_id").notNull(), // Meta App ID
-  whatsappAppSecret: text("whatsapp_app_secret").notNull(), // encrypted Meta App Secret for HMAC
-  whatsappPhoneNumberId: text("whatsapp_phone_number_id").notNull(), // Sender ID
-  whatsappAccessToken: text("whatsapp_access_token").notNull(), // encrypted
-  whatsappVerifyToken: text("whatsapp_verify_token").notNull(), // auto-generated UUID
-  // CES / Google fields
-  cesAppVersion: text("ces_app_version").notNull(), // full path: projects/P/locations/L/apps/A/versions/V
-  cesDeployment: text("ces_deployment"), // full path (optional): projects/.../deployments/D
-  googleAccessToken: text("google_access_token").notNull(), // encrypted Google OAuth token
-  websiteDomain: text("website_domain"),
-  widgetKey: text("widget_key"),
-  widgetTitle: text("widget_title"),
-  widgetBubbleColor: text("widget_bubble_color"),
-  widgetFontFamily: text("widget_font_family"),
-  widgetGreeting: text("widget_greeting"),
+  email: text("email").unique().notNull(),
+  passwordHash: text("password_hash").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// End user sessions — one per (connection, waId) pair
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    adminUserId: uuid("admin_user_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [index("idx_admin_sessions_admin_user_id").on(t.adminUserId)]
+);
+
+export const agents = pgTable("agents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  cesAppVersion: text("ces_app_version").notNull(),
+  cesDeployment: text("ces_deployment"),
+  googleServiceAccount: text("google_service_account").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const channels = pgTable(
+  "channels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentId: uuid("agent_id").references(() => agents.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    type: channelTypeEnum("type").default("whatsapp").notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    whatsappAppId: text("whatsapp_app_id").notNull(),
+    whatsappAppSecret: text("whatsapp_app_secret").notNull(),
+    whatsappPhoneNumberId: text("whatsapp_phone_number_id").notNull(),
+    whatsappAccessToken: text("whatsapp_access_token").notNull(),
+    whatsappVerifyToken: text("whatsapp_verify_token").notNull(),
+    websiteDomain: text("website_domain"),
+    widgetKey: text("widget_key"),
+    widgetTitle: text("widget_title"),
+    widgetBubbleColor: text("widget_bubble_color"),
+    widgetFontFamily: text("widget_font_family"),
+    widgetGreeting: text("widget_greeting"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_channels_agent_id").on(t.agentId),
+    index("idx_channels_type").on(t.type),
+  ]
+);
+
 export const endUserSessions = pgTable(
   "end_user_sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    connectionId: uuid("connection_id")
+    channelId: uuid("channel_id")
       .notNull()
-      .references(() => connections.id, { onDelete: "cascade" }),
-    waId: text("wa_id").notNull(), // WhatsApp phone number of end user
-    cesSessionId: uuid("ces_session_id").defaultRandom().notNull(), // CES session UUID
+      .references(() => channels.id, { onDelete: "cascade" }),
+    waId: text("wa_id").notNull(),
+    cesSessionId: uuid("ces_session_id").defaultRandom().notNull(),
     mode: sessionModeEnum("mode").default("ai").notNull(),
     humanModeStartedAt: timestamp("human_mode_started_at"),
     excludeHumanMessagesFromHistory: boolean(
@@ -100,12 +107,11 @@ export const endUserSessions = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => [
-    uniqueIndex("unique_connection_wa_id").on(t.connectionId, t.waId),
-    index("idx_sessions_connection_id").on(t.connectionId),
+    uniqueIndex("unique_channel_wa_id").on(t.channelId, t.waId),
+    index("idx_sessions_channel_id").on(t.channelId),
   ]
 );
 
-// Messages table
 export const messages = pgTable(
   "messages",
   {
@@ -116,7 +122,7 @@ export const messages = pgTable(
     direction: messageDirectionEnum("direction").notNull(),
     senderType: senderTypeEnum("sender_type").notNull(),
     content: text("content").notNull(),
-    whatsappMessageId: text("whatsapp_message_id"), // for deduplication
+    whatsappMessageId: text("whatsapp_message_id"),
     isHumanAgentMessage: boolean("is_human_agent_message")
       .default(false)
       .notNull(),
@@ -132,17 +138,35 @@ export const messages = pgTable(
   ]
 );
 
-// Relations
-export const connectionsRelations = relations(connections, ({ many }) => ({
+export const adminUsersRelations = relations(adminUsers, ({ many }) => ({
+  sessions: many(adminSessions),
+}));
+
+export const adminSessionsRelations = relations(adminSessions, ({ one }) => ({
+  adminUser: one(adminUsers, {
+    fields: [adminSessions.adminUserId],
+    references: [adminUsers.id],
+  }),
+}));
+
+export const agentsRelations = relations(agents, ({ many }) => ({
+  channels: many(channels),
+}));
+
+export const channelsRelations = relations(channels, ({ one, many }) => ({
+  agent: one(agents, {
+    fields: [channels.agentId],
+    references: [agents.id],
+  }),
   sessions: many(endUserSessions),
 }));
 
 export const endUserSessionsRelations = relations(
   endUserSessions,
   ({ one, many }) => ({
-    connection: one(connections, {
-      fields: [endUserSessions.connectionId],
-      references: [connections.id],
+    channel: one(channels, {
+      fields: [endUserSessions.channelId],
+      references: [channels.id],
     }),
     messages: many(messages),
   })

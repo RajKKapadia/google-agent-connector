@@ -3,13 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Menu,
-  LayoutDashboard,
-  Plug,
-  MessageSquare,
-  CreditCard,
-} from "lucide-react";
+import { Bot, LayoutDashboard, Link2, Menu, MessagesSquare, Plug } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -22,9 +16,10 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/connections", label: "Connections", icon: Plug },
-  { href: "/sessions", label: "Sessions", icon: MessageSquare },
-  { href: "/billing", label: "Billing", icon: CreditCard },
+  { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/channels", label: "Channels", icon: Plug },
+  { href: "/mappings", label: "Mappings", icon: Link2 },
+  { href: "/conversations", label: "Conversations", icon: MessagesSquare },
 ];
 
 export function MobileNav() {
@@ -39,38 +34,35 @@ export function MobileNav() {
           <span className="sr-only">Open menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-60 p-0" aria-describedby={undefined}>
+      <SheetContent side="left" className="w-64 p-0" aria-describedby={undefined}>
         <SheetHeader className="sr-only">
           <SheetTitle>Navigation Menu</SheetTitle>
         </SheetHeader>
-        <div className="h-14 flex items-center px-4 border-b shrink-0">
-          <Link
-            href="/dashboard"
-            className="text-lg font-bold"
-            onClick={() => setOpen(false)}
-          >
+        <div className="flex h-14 items-center border-b px-4">
+          <Link href="/dashboard" className="text-lg font-semibold" onClick={() => setOpen(false)}>
             CES Connector
           </Link>
         </div>
-        <nav className="p-3 space-y-1">
+        <nav className="space-y-1 p-3">
           {navItems.map((item) => {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
                 : pathname.startsWith(item.href);
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             );

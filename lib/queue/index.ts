@@ -1,14 +1,13 @@
 import { Queue } from "bullmq";
 
 export interface MessageJobData {
-  connectionId: string;
+  channelId: string;
   waId: string;
   messageText: string;
   messageId: string;
   timestamp: number;
 }
 
-// Use URL-based connection options to avoid IORedis version conflicts
 function getRedisConnection() {
   return { url: process.env.REDIS_URL! };
 }
