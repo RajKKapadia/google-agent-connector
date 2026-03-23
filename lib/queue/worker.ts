@@ -1,5 +1,4 @@
 import { Worker, Job } from "bullmq";
-import IORedis from "ioredis";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -9,25 +8,9 @@ import {
 } from "@/lib/db/schema";
 import { createCESClient } from "@/lib/ces/client";
 import { createWhatsAppClient } from "@/lib/whatsapp/client";
+import { buildCesInput } from "@/lib/sessions/ces";
+import { createMessageEvent, publishSessionEvent } from "@/lib/sessions/realtime";
 import type { MessageJobData } from "./index";
-
-// Separate Redis connection for pub/sub publishing (uses direct IORedis)
-function createPubClient() {
-  return new IORedis(process.env.REDIS_URL!, { maxRetriesPerRequest: null });
-}
-
-function buildCesInput(messageText: string, pendingCesContext?: string | null) {
-  if (!pendingCesContext) {
-    return messageText;
-  }
-
-  return [
-    "Conversation context from the recent human takeover:",
-    pendingCesContext,
-    "",
-    `Latest user message: ${messageText}`,
-  ].join("\n");
-}
 
 export async function processMessage(job: Job<MessageJobData>): Promise<void> {
   const { connectionId, waId, messageText, messageId } = job.data;
@@ -114,15 +97,7 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
 
   // 5. Publish incoming message event
   if (insertedIncomingMessage) {
-    const pub = createPubClient();
-    try {
-      await pub.publish(
-        `session:${session.id}`,
-        JSON.stringify({ type: "message", message: incomingMessage })
-      );
-    } finally {
-      pub.disconnect();
-    }
+    await publishSessionEvent(session.id, createMessageEvent(incomingMessage));
   }
 
   // 6. If mode is 'human', stop here — no CES call
@@ -177,15 +152,7 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
   }
 
   // 10. Publish outgoing message event
-  const pub2 = createPubClient();
-  try {
-    await pub2.publish(
-      `session:${session.id}`,
-      JSON.stringify({ type: "message", message: outgoingMessage })
-    );
-  } finally {
-    pub2.disconnect();
-  }
+  await publishSessionEvent(session.id, createMessageEvent(outgoingMessage));
 }
 
 export function createMessageWorker(): Worker<MessageJobData> {

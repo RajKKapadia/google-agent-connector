@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { connections, endUserSessions, messages } from "@/lib/db/schema";
 import { createCESClient } from "@/lib/ces/client";
+import { buildCesInput } from "@/lib/sessions/ces";
+import {
+  createMessageEvent,
+  publishSessionEvent,
+  serializeSessionMessage,
+} from "@/lib/sessions/realtime";
 import { verifyWidgetAccessToken } from "@/lib/widget/security";
 
 export async function POST(
@@ -38,8 +44,8 @@ export async function POST(
     return NextResponse.json({ error: "Message is required" }, { status: 400 });
   }
 
-  const browserSession = (body.sessionId || crypto.randomUUID()).slice(0, 64);
-  const waId = `web:${browserSession}`;
+  const browserSessionId = (body.sessionId || crypto.randomUUID()).slice(0, 64);
+  const waId = `web:${browserSessionId}`;
 
   let session = await db.query.endUserSessions.findFirst({
     where: and(
@@ -52,29 +58,99 @@ export async function POST(
     const [created] = await db
       .insert(endUserSessions)
       .values({ connectionId, waId })
+      .onConflictDoNothing({
+        target: [endUserSessions.connectionId, endUserSessions.waId],
+      })
       .returning();
-    session = created;
+
+    if (created) {
+      session = created;
+    } else {
+      session = await db.query.endUserSessions.findFirst({
+        where: and(
+          eq(endUserSessions.connectionId, connectionId),
+          eq(endUserSessions.waId, waId)
+        ),
+      });
+    }
   }
 
-  await db.insert(messages).values({
-    sessionId: session.id,
-    direction: "incoming",
-    senderType: "user",
-    content: messageText,
-    isHumanAgentMessage: false,
-  });
+  if (!session) {
+    return NextResponse.json(
+      { error: "Failed to create website session" },
+      { status: 500 }
+    );
+  }
+
+  const [incomingMessage] = await db
+    .insert(messages)
+    .values({
+      sessionId: session.id,
+      direction: "incoming",
+      senderType: "user",
+      content: messageText,
+      isHumanAgentMessage: false,
+    })
+    .returning();
+
+  await db
+    .update(endUserSessions)
+    .set({ lastActivityAt: new Date(), updatedAt: new Date() })
+    .where(eq(endUserSessions.id, session.id));
+
+  await publishSessionEvent(session.id, createMessageEvent(incomingMessage));
+
+  if (session.mode === "human") {
+    await db
+      .update(messages)
+      .set({ aiHandledAt: new Date() })
+      .where(eq(messages.id, incomingMessage.id));
+
+    return NextResponse.json({
+      sessionId: browserSessionId,
+      mode: session.mode,
+      messages: [serializeSessionMessage(incomingMessage)],
+    });
+  }
 
   const cesClient = createCESClient(connection);
-  const cesResponse = await cesClient.runSession(session.cesSessionId, messageText);
+  const cesResponse = await cesClient.runSession(
+    session.cesSessionId,
+    buildCesInput(messageText, session.pendingCesContext)
+  );
   const responseText = cesClient.extractTextResponse(cesResponse);
 
-  await db.insert(messages).values({
-    sessionId: session.id,
-    direction: "outgoing",
-    senderType: "ai",
-    content: responseText,
-    isHumanAgentMessage: false,
-  });
+  const [outgoingMessage] = await db
+    .insert(messages)
+    .values({
+      sessionId: session.id,
+      direction: "outgoing",
+      senderType: "ai",
+      content: responseText,
+      isHumanAgentMessage: false,
+    })
+    .returning();
 
-  return NextResponse.json({ reply: responseText, sessionId: browserSession });
+  await db
+    .update(messages)
+    .set({ aiHandledAt: new Date() })
+    .where(eq(messages.id, incomingMessage.id));
+
+  if (session.pendingCesContext) {
+    await db
+      .update(endUserSessions)
+      .set({ pendingCesContext: null, updatedAt: new Date() })
+      .where(eq(endUserSessions.id, session.id));
+  }
+
+  await publishSessionEvent(session.id, createMessageEvent(outgoingMessage));
+
+  return NextResponse.json({
+    sessionId: browserSessionId,
+    mode: session.mode,
+    messages: [
+      serializeSessionMessage(incomingMessage),
+      serializeSessionMessage(outgoingMessage),
+    ],
+  });
 }

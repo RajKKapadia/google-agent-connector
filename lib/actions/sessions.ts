@@ -4,10 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq, and, gte, inArray } from "drizzle-orm";
-import IORedis from "ioredis";
 import { db } from "@/lib/db";
 import { endUserSessions, connections, messages } from "@/lib/db/schema";
 import { createWhatsAppClient } from "@/lib/whatsapp/client";
+import { buildPendingCesContext } from "@/lib/sessions/ces";
+import { createMessageEvent, createModeEvent, publishSessionEvent } from "@/lib/sessions/realtime";
 import type { ActionResult } from "./connections";
 
 async function verifySessionOwnership(sessionId: string, userId: string) {
@@ -21,29 +22,6 @@ async function verifySessionOwnership(sessionId: string, userId: string) {
   }
 
   return session;
-}
-
-const CES_CONTEXT_CHAR_LIMIT = 4000;
-
-function buildPendingCesContext(
-  history: Array<{ senderType: "user" | "human_agent"; content: string }>
-) {
-  if (history.length === 0) {
-    return null;
-  }
-
-  const transcript = history
-    .map((message) => {
-      const label = message.senderType === "human_agent" ? "Human agent" : "User";
-      return `${label}: ${message.content.trim()}`;
-    })
-    .join("\n");
-
-  if (transcript.length <= CES_CONTEXT_CHAR_LIMIT) {
-    return transcript;
-  }
-
-  return transcript.slice(transcript.length - CES_CONTEXT_CHAR_LIMIT);
 }
 
 export async function setSessionMode(
@@ -103,6 +81,7 @@ export async function setSessionMode(
     .set(updateData)
     .where(eq(endUserSessions.id, sessionId));
 
+  await publishSessionEvent(sessionId, createModeEvent(mode));
   revalidatePath(`/sessions/${sessionId}`);
 
   return { success: true };
@@ -132,9 +111,10 @@ export async function sendHumanAgentMessage(
     return { success: false, error: "Message cannot be empty" };
   }
 
-  // Send WhatsApp message
-  const waClient = createWhatsAppClient(session.connection);
-  await waClient.sendTextMessage({ to: session.waId, text: content.trim() });
+  if (session.connection.type === "whatsapp") {
+    const waClient = createWhatsAppClient(session.connection);
+    await waClient.sendTextMessage({ to: session.waId, text: content.trim() });
+  }
 
   // Insert message record
   const [newMessage] = await db
@@ -154,16 +134,7 @@ export async function sendHumanAgentMessage(
     .set({ lastActivityAt: new Date(), updatedAt: new Date() })
     .where(eq(endUserSessions.id, sessionId));
 
-  // Publish SSE event
-  const pub = new IORedis(process.env.REDIS_URL!, {
-    maxRetriesPerRequest: null,
-  });
-  await pub
-    .publish(
-      `session:${sessionId}`,
-      JSON.stringify({ type: "message", message: newMessage })
-    )
-    .finally(() => pub.quit());
+  await publishSessionEvent(sessionId, createMessageEvent(newMessage));
 
   return { success: true, data: { messageId: newMessage.id } };
 }
