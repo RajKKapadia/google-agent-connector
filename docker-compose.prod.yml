@@ -9,6 +9,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cesconnector}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - internal
 
@@ -17,6 +23,12 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     networks:
       - internal
 
@@ -29,8 +41,10 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - internal
 
@@ -41,8 +55,10 @@ services:
     restart: unless-stopped
     env_file: .env.production
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - internal
 

@@ -6,7 +6,9 @@ import { createCESClient } from "@/lib/ces/client";
 import { createWhatsAppClient } from "@/lib/whatsapp/client";
 import { buildCesInput } from "@/lib/sessions/ces";
 import { createMessageEvent, publishSessionEvent } from "@/lib/sessions/realtime";
+import { getWorkerConcurrency } from "./config";
 import type { MessageJobData } from "./index";
+import { acquireSessionLock } from "./session-lock";
 
 export async function processMessage(job: Job<MessageJobData>): Promise<void> {
   const { channelId, waId, messageText, messageId } = job.data;
@@ -24,115 +26,132 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
     throw new Error(`Channel ${channelId} is not mapped to an agent`);
   }
 
-  let session = await db.query.endUserSessions.findFirst({
-    where: and(eq(endUserSessions.channelId, channelId), eq(endUserSessions.waId, waId)),
-  });
+  const sessionLock = await acquireSessionLock(channelId, waId);
 
-  if (!session) {
-    const [newSession] = await db
-      .insert(endUserSessions)
+  try {
+    let session = await db.query.endUserSessions.findFirst({
+      where: and(
+        eq(endUserSessions.channelId, channelId),
+        eq(endUserSessions.waId, waId)
+      ),
+    });
+
+    if (!session) {
+      const [newSession] = await db
+        .insert(endUserSessions)
+        .values({
+          channelId,
+          waId,
+        })
+        .onConflictDoNothing({
+          target: [endUserSessions.channelId, endUserSessions.waId],
+        })
+        .returning();
+
+      if (newSession) {
+        session = newSession;
+      } else {
+        session = await db.query.endUserSessions.findFirst({
+          where: and(
+            eq(endUserSessions.channelId, channelId),
+            eq(endUserSessions.waId, waId)
+          ),
+        });
+      }
+    }
+
+    if (!session) {
+      throw new Error(`Failed to create session for ${channelId}/${waId}`);
+    }
+
+    const [insertedIncomingMessage] = await db
+      .insert(messages)
       .values({
-        channelId,
-        waId,
+        sessionId: session.id,
+        direction: "incoming",
+        senderType: "user",
+        content: messageText,
+        whatsappMessageId: messageId,
+        isHumanAgentMessage: false,
       })
-      .onConflictDoNothing({
-        target: [endUserSessions.channelId, endUserSessions.waId],
+      .onConflictDoNothing({ target: messages.whatsappMessageId })
+      .returning();
+
+    session =
+      (await db.query.endUserSessions.findFirst({
+        where: eq(endUserSessions.id, session.id),
+      })) ?? session;
+
+    const incomingMessage =
+      insertedIncomingMessage ??
+      (await db.query.messages.findFirst({
+        where: eq(messages.whatsappMessageId, messageId),
+      }));
+
+    if (!incomingMessage) {
+      throw new Error(`Failed to load inbound message ${messageId}`);
+    }
+
+    if (insertedIncomingMessage) {
+      await db
+        .update(endUserSessions)
+        .set({ lastActivityAt: new Date(), updatedAt: new Date() })
+        .where(eq(endUserSessions.id, session.id));
+
+      await publishSessionEvent(session.id, createMessageEvent(incomingMessage));
+    }
+
+    if (session.mode === "human") {
+      if (!incomingMessage.aiHandledAt) {
+        await db
+          .update(messages)
+          .set({ aiHandledAt: new Date() })
+          .where(eq(messages.id, incomingMessage.id));
+      }
+      return;
+    }
+
+    if (incomingMessage.aiHandledAt) {
+      return;
+    }
+
+    const cesClient = createCESClient(channel.agent);
+    const cesResponse = await cesClient.runSession(
+      session.cesSessionId,
+      buildCesInput(messageText, session.pendingCesContext)
+    );
+    const responseText = cesClient.extractTextResponse(cesResponse);
+
+    const waClient = createWhatsAppClient(channel);
+    await waClient.sendTextMessage({ to: waId, text: responseText });
+
+    const [outgoingMessage] = await db
+      .insert(messages)
+      .values({
+        sessionId: session.id,
+        direction: "outgoing",
+        senderType: "ai",
+        content: responseText,
+        isHumanAgentMessage: false,
       })
       .returning();
 
-    if (newSession) {
-      session = newSession;
-    } else {
-      session = await db.query.endUserSessions.findFirst({
-        where: and(eq(endUserSessions.channelId, channelId), eq(endUserSessions.waId, waId)),
-      });
-    }
-  }
-
-  if (!session) {
-    throw new Error(`Failed to create session for ${channelId}/${waId}`);
-  }
-
-  const [insertedIncomingMessage] = await db
-    .insert(messages)
-    .values({
-      sessionId: session.id,
-      direction: "incoming",
-      senderType: "user",
-      content: messageText,
-      whatsappMessageId: messageId,
-      isHumanAgentMessage: false,
-    })
-    .onConflictDoNothing({ target: messages.whatsappMessageId })
-    .returning();
-
-  const incomingMessage =
-    insertedIncomingMessage ??
-    (await db.query.messages.findFirst({
-      where: eq(messages.whatsappMessageId, messageId),
-    }));
-
-  if (!incomingMessage) {
-    throw new Error(`Failed to load inbound message ${messageId}`);
-  }
-
-  if (insertedIncomingMessage) {
     await db
-      .update(endUserSessions)
-      .set({ lastActivityAt: new Date(), updatedAt: new Date() })
-      .where(eq(endUserSessions.id, session.id));
+      .update(messages)
+      .set({ aiHandledAt: new Date() })
+      .where(eq(messages.id, incomingMessage.id));
 
-    await publishSessionEvent(session.id, createMessageEvent(incomingMessage));
-  }
-
-  if (session.mode === "human") {
-    if (!incomingMessage.aiHandledAt) {
+    if (session.pendingCesContext) {
       await db
-        .update(messages)
-        .set({ aiHandledAt: new Date() })
-        .where(eq(messages.id, incomingMessage.id));
+        .update(endUserSessions)
+        .set({ pendingCesContext: null, updatedAt: new Date() })
+        .where(eq(endUserSessions.id, session.id));
     }
-    return;
+
+    await publishSessionEvent(session.id, createMessageEvent(outgoingMessage));
+  } finally {
+    await sessionLock.release();
   }
-
-  if (incomingMessage.aiHandledAt) {
-    return;
-  }
-
-  const cesClient = createCESClient(channel.agent);
-  const cesResponse = await cesClient.runSession(
-    session.cesSessionId,
-    buildCesInput(messageText, session.pendingCesContext)
-  );
-  const responseText = cesClient.extractTextResponse(cesResponse);
-
-  const waClient = createWhatsAppClient(channel);
-  await waClient.sendTextMessage({ to: waId, text: responseText });
-
-  const [outgoingMessage] = await db
-    .insert(messages)
-    .values({
-      sessionId: session.id,
-      direction: "outgoing",
-      senderType: "ai",
-      content: responseText,
-      isHumanAgentMessage: false,
-    })
-    .returning();
-
-  await db
-    .update(messages)
-    .set({ aiHandledAt: new Date() })
-    .where(eq(messages.id, incomingMessage.id));
-
-  if (session.pendingCesContext) {
-    await db
-      .update(endUserSessions)
-      .set({ pendingCesContext: null, updatedAt: new Date() })
-      .where(eq(endUserSessions.id, session.id));
-  }
-
-  await publishSessionEvent(session.id, createMessageEvent(outgoingMessage));
 }
 
 export function createMessageWorker(): Worker<MessageJobData> {
@@ -141,7 +160,7 @@ export function createMessageWorker(): Worker<MessageJobData> {
     processMessage,
     {
       connection: { url: process.env.REDIS_URL! },
-      concurrency: 10,
+      concurrency: getWorkerConcurrency(),
     }
   );
 

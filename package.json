@@ -8,7 +8,7 @@
     "dev:all": "concurrently \"pnpm dev\" \"pnpm dev:worker\"",
     "build": "next build",
     "start": "next start",
-    "worker:start": "node --env-file=.env --import=tsx/esm worker/index.ts",
+    "worker:start": "node --import=tsx/esm worker/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -55,3 +55,4 @@
     "typescript": "^5"
   }
 }
+
