@@ -5,8 +5,10 @@ export default function NewAgentPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Add Google CX Agent</h1>
-        <p className="text-sm text-muted-foreground">Store the CES app version and service account used for routed conversations.</p>
+        <h1 className="text-2xl font-semibold">Add Google Agent</h1>
+        <p className="text-sm text-muted-foreground">
+          Store either a CES Agent Studio target or a Conversational Agents target with the shared service account used for routed conversations.
+        </p>
       </div>
       <Card>
         <CardHeader>

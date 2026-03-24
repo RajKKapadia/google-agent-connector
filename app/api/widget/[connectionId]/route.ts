@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { channels, endUserSessions, messages } from "@/lib/db/schema";
-import { createCESClient } from "@/lib/ces/client";
+import { createGoogleAgentClient } from "@/lib/google-agent/client";
 import { buildCesInput } from "@/lib/sessions/ces";
 import {
   createMessageEvent,
@@ -121,12 +121,11 @@ export async function POST(
     });
   }
 
-  const cesClient = createCESClient(channel.agent);
-  const cesResponse = await cesClient.runSession(
+  const agentClient = createGoogleAgentClient(channel.agent);
+  const responseText = await agentClient.sendText(
     session.cesSessionId,
     buildCesInput(messageText, session.pendingCesContext)
   );
-  const responseText = cesClient.extractTextResponse(cesResponse);
 
   const [outgoingMessage] = await db
     .insert(messages)

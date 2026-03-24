@@ -140,7 +140,7 @@ docker compose -f docker-compose.prod.yml up -d --scale worker=2
 - Open the app in the browser.
 - On first run, the app redirects to `/setup`.
 - Create the initial admin account.
-- Add at least one CES agent, one channel, and one mapping before testing external traffic.
+- Add at least one Google agent, one channel, and one mapping before testing external traffic.
 
 ## Operational Notes
 
@@ -189,3 +189,4 @@ Make sure:
 - the stack is already running
 - `DATABASE_URL` uses the `postgres` hostname in `.env.production`
 - the credentials in `DATABASE_URL` match `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`
+

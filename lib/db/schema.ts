@@ -21,6 +21,10 @@ export const senderTypeEnum = pgEnum("sender_type", [
   "human_agent",
 ]);
 export const channelTypeEnum = pgEnum("channel_type", ["whatsapp", "website"]);
+export const agentPlatformEnum = pgEnum("agent_platform", [
+  "ces_agent_studio",
+  "conversational_agents",
+]);
 
 export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -48,8 +52,13 @@ export const adminSessions = pgTable(
 export const agents = pgTable("agents", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  cesAppVersion: text("ces_app_version").notNull(),
+  platform: agentPlatformEnum("platform").default("ces_agent_studio").notNull(),
+  cesAppVersion: text("ces_app_version"),
   cesDeployment: text("ces_deployment"),
+  dialogflowProjectId: text("dialogflow_project_id"),
+  dialogflowLocation: text("dialogflow_location"),
+  dialogflowAgentId: text("dialogflow_agent_id"),
+  dialogflowEnvironmentId: text("dialogflow_environment_id"),
   googleServiceAccount: text("google_service_account").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

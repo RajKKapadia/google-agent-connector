@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { eq } from "drizzle-orm";
+import { getAgentPlatformLabel, getAgentResourceSummary } from "@/lib/agents/config";
 import { db } from "@/lib/db";
 import { agents } from "@/lib/db/schema";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -25,8 +27,13 @@ export default async function AgentDetailPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{agent.name}</h1>
-          <p className="text-sm text-muted-foreground">Mapped channels: {agent.channels.length}</p>
+          <div className="mb-2 flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">{agent.name}</h1>
+            <Badge variant="outline">{getAgentPlatformLabel(agent.platform)}</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Mapped channels: {agent.channels.length}
+          </p>
         </div>
         <Button asChild>
           <Link href={`/agents/${agent.id}/edit`}>Edit Agent</Link>
@@ -39,13 +46,26 @@ export default async function AgentDetailPage({
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div>
-            <div className="text-muted-foreground">CES App Version</div>
-            <div className="font-mono text-xs">{agent.cesAppVersion}</div>
+            <div className="text-muted-foreground">Platform</div>
+            <div>{getAgentPlatformLabel(agent.platform)}</div>
           </div>
           <div>
-            <div className="text-muted-foreground">CES Deployment</div>
-            <div className="font-mono text-xs">{agent.cesDeployment || "Not set"}</div>
+            <div className="text-muted-foreground">Primary Resource</div>
+            <div className="font-mono text-xs">{getAgentResourceSummary(agent)}</div>
           </div>
+          {agent.platform === "ces_agent_studio" ? (
+            <div>
+              <div className="text-muted-foreground">CES Deployment</div>
+              <div className="font-mono text-xs">{agent.cesDeployment || "Not set"}</div>
+            </div>
+          ) : (
+            <div>
+              <div className="text-muted-foreground">Environment</div>
+              <div className="font-mono text-xs">
+                {agent.dialogflowEnvironmentId || "Direct agent session path"}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
