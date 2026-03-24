@@ -1,152 +1,190 @@
 # CES Connector
 
-CES Connector is a self-hosted admin console for routing WhatsApp and website widget conversations into Google Customer Engagement Suite (CES) and Conversational Agents platforms.
+CES Connector is a self-hosted admin console for routing customer conversations from WhatsApp and an embeddable website chat widget into Google agents.
 
-## What It Does
+It supports two Google targets:
 
-- Create a local admin account on first run.
-- Add Google agents with either CES Agent Studio or Conversational Agents configuration plus service account credentials.
-- Add WhatsApp channels and website widget channels.
-- Map each channel to exactly one agent.
-- View live conversations and switch between AI mode and human takeover.
+- Google Customer Engagement Suite (CES) Agent Studio
+- Google Conversational Agents / Dialogflow CX
 
-## Architecture Overview
+The app gives an internal team one place to configure channels, map each channel to an agent, and monitor live conversations with optional human takeover.
+
+## What the App Does
+
+- Creates the first admin account locally on initial startup
+- Stores Google agent credentials and channel secrets in encrypted form
+- Accepts inbound traffic from WhatsApp Cloud API webhooks
+- Serves a website chat widget plus its event endpoints
+- Routes each channel to exactly one Google agent
+- Persists sessions and messages in PostgreSQL
+- Uses Redis and BullMQ for background processing and realtime updates
+- Lets operators switch a conversation between AI mode and human mode
+
+## How It Works
 
 ```text
-WhatsApp User / Website Visitor
-   |
-   v
-Channel endpoint (/api/webhooks/[connectionId] or /api/widget/[connectionId])
-   | resolves mapped agent
-   v
-BullMQ Worker / direct widget execution
-   | calls Google agent API, persists messages, publishes realtime updates
-   v
-PostgreSQL + Redis pub/sub + SSE
-   v
-Admin Console (/dashboard, /channels, /agents, /mappings, /conversations)
+WhatsApp user / website visitor
+        |
+        v
+Public webhook or widget endpoint
+        |
+        v
+Mapped Google agent is resolved
+        |
+        v
+Worker processes the message and stores conversation history
+        |
+        v
+Dashboard shows the conversation and allows human takeover
 ```
 
-## Tech Stack
+## Stack
 
-- Next.js 16 (App Router) + TypeScript
-- Local admin auth using signed HTTP-only cookies
-- PostgreSQL + Drizzle ORM
-- BullMQ + Redis
-- Google CES Agent Studio REST API
-- Google Dialogflow CX / Conversational Agents client library
+- Next.js 16 with App Router
+- TypeScript
+- PostgreSQL with Drizzle ORM
+- Redis + BullMQ
+- Google CES API and Dialogflow CX client
 - WhatsApp Cloud API
-- shadcn/ui + Tailwind CSS
-- Docker Compose deployment
-
-## Documentation
-
-- Local setup and production deployment: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-- License terms: [LICENSE](LICENSE)
+- Tailwind CSS + shadcn/ui
+- Docker Compose for local and production deployment
 
 ## Prerequisites
 
-1. Node.js 20+
-2. pnpm
-3. Docker + Docker Compose
-4. Credentials for:
-   - Meta Developer / WhatsApp Cloud API
-   - Google Cloud with CES or Conversational Agents enabled and a service account JSON
+- Node.js 20+
+- pnpm
+- Docker Engine with Docker Compose
+- A PostgreSQL database
+- A Redis instance
+- Google Cloud service account credentials for CES or Conversational Agents
+- Meta WhatsApp Cloud API credentials if you want WhatsApp support
 
-## Quick Start
+## Local Development
 
-### 1) Install dependencies
+### 1. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-### 2) Start Postgres + Redis
+### 2. Start Postgres and Redis
 
 ```bash
 docker compose up -d
 ```
 
-### 3) Create local env file
+### 3. Create the environment file
 
 ```bash
 cp .env.example .env
 ```
 
-Fill these values in `.env`:
+Required values:
 
 - `NEXT_PUBLIC_APP_URL`
-- `AUTH_SESSION_SECRET`
 - `DATABASE_URL`
 - `REDIS_URL`
 - `ENCRYPTION_KEY`
+- `AUTH_SESSION_SECRET`
 
-Generate secrets with:
+Optional worker tuning:
+
+- `WORKER_CONCURRENCY`
+- `WORKER_SESSION_LOCK_TTL_MS`
+- `WORKER_SESSION_LOCK_WAIT_MS`
+
+Generate the secrets with:
 
 ```bash
-openssl rand -hex 32   # ENCRYPTION_KEY
-openssl rand -hex 32   # AUTH_SESSION_SECRET
+openssl rand -hex 32
+openssl rand -hex 32
 ```
 
-### 4) Apply the database migration
+### 4. Run database migrations
 
 ```bash
 pnpm db:migrate
 ```
 
-### 5) Start the app and worker
+### 5. Start the app and background worker
 
 ```bash
 pnpm dev:all
 ```
 
-The app opens at `http://localhost:3000`.
+The app runs at `http://localhost:3000`.
 
 ## First Run
 
-When no admin user exists, `/setup` is shown automatically.
+On a fresh database, the app redirects to `/setup`.
 
-Create the initial admin account, then log in to the internal dashboard.
+Create the initial admin user there. After that, the normal flow is:
 
-## Admin Workflow
+1. Add a Google agent
+2. Add a channel
+3. Map the channel to the agent
+4. Test traffic through WhatsApp or the website widget
+5. Monitor and manage conversations from the dashboard
 
-1. Add a Google agent.
-2. Choose CES Agent Studio or Conversational Agents.
-3. Add a WhatsApp channel or website widget channel.
-4. Map the channel to an agent.
-5. Configure the public integration:
-   - WhatsApp: use the webhook URL + verify token shown on the channel detail page.
-   - Website widget: use the generated embed script shown on the channel detail page.
-6. Monitor and manage conversations from `/conversations`.
+## Channel Types
+
+### WhatsApp
+
+Use this when you want CES Connector to receive Meta webhook events and send outbound WhatsApp replies.
+
+You will configure:
+
+- Meta App ID
+- Meta App Secret
+- Phone Number ID
+- WhatsApp access token
+
+After creating the channel, the dashboard gives you the webhook URL and verify token needed in Meta.
+
+### Website Widget
+
+Use this when you want to embed a chat widget on your own site.
+
+You will configure:
+
+- Allowed site or domain
+- Widget title
+- Optional bubble color
+- Optional font family
+
+After creating the channel, the dashboard provides the embed script to place before `</body>`.
 
 ## Human Takeover
 
-From a conversation page:
+Each conversation can run in one of two modes:
 
-- `Take Over` pauses AI replies.
-- `Return to AI` resumes Google agent replies.
-- Human messages can optionally be excluded from the AI handoff context.
+- `ai`: incoming messages are routed to the configured Google agent
+- `human`: an operator responds manually from the dashboard
 
-## Database Commands
+Operators can return the session to AI mode later, and the app can exclude human messages from the next AI handoff context when needed.
+
+## Available Commands
 
 ```bash
+pnpm dev
+pnpm dev:worker
+pnpm dev:all
+pnpm build
+pnpm start
+pnpm worker:start
 pnpm db:generate
 pnpm db:migrate
 pnpm db:push
-pnpm db:repair:messages
 pnpm db:studio
-```
-
-## Testing
-
-```bash
-pnpm test
 pnpm lint
+pnpm test
 ```
 
-## Production Deployment
+## Production
 
-Use the full guide in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The short version is:
+For a full deployment walkthrough, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+Short version:
 
 ```bash
 cp .env.production.example .env.production
@@ -155,15 +193,29 @@ docker compose -f docker-compose.prod.yml run --rm worker pnpm db:migrate
 docker compose -f docker-compose.prod.yml up -d --scale worker=2
 ```
 
-The production stack keeps `app` as a single replica and scales only the queue worker.
+Production expects:
 
-## Security Notes
+- a public HTTPS URL in `NEXT_PUBLIC_APP_URL`
+- a reverse proxy in front of the app
+- `app` to stay single-replica
+- workers to be scaled independently
 
-- Admin auth uses a signed HTTP-only session cookie.
-- Sensitive channel and agent credentials are encrypted before storage.
-- WhatsApp webhook signatures are verified per channel.
-- Public widget and webhook endpoints remain unauthenticated by design.
+## Repository Notes
+
+- `app/`: Next.js routes, pages, and API endpoints
+- `components/`: dashboard, auth, widget, and UI components
+- `lib/`: auth, database, queue, encryption, and integration clients
+- `worker/`: BullMQ worker entrypoint
+- `tests/`: Node test suite
+- `docs/DEPLOYMENT.md`: deployment and operations guide
+
+## Security
+
+- Admin access uses signed HTTP-only session cookies
+- Sensitive Google and channel credentials are encrypted before storage
+- WhatsApp webhook requests are verified per channel
+- Public webhook and widget endpoints are intentionally unauthenticated
 
 ## License
 
-This repository is available under the PolyForm Noncommercial License 1.0.0. Individuals and organizations can use, study, and modify it for noncommercial purposes, but commercial use requires separate permission from the copyright holder.
+This project is licensed under the PolyForm Noncommercial License 1.0.0. See [LICENSE](LICENSE).
