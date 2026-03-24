@@ -15,8 +15,9 @@ import {
 
 const quickActions = [
   {
-    title: "Add Google CX Agent",
-    description: "Register a CES app version and service account for routing.",
+    title: "Add Google Agent",
+    description:
+      "Register a CES Agent Studio or Conversational Agents target for routing.",
     href: "/agents/new",
     icon: Bot,
   },
@@ -34,7 +35,7 @@ const quickActions = [
   },
   {
     title: "Map Channel to Agent",
-    description: "Assign exactly one CES agent to each live channel.",
+    description: "Assign exactly one Google agent to each live channel.",
     href: "/mappings",
     icon: Link2,
   },
@@ -70,7 +71,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Admin Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Manage Google CX agents, channel configuration, mappings, and conversations from one internal console.
+            Manage Google agents, channel configuration, mappings, and conversations from one internal console.
           </p>
         </div>
         <Badge variant="outline" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.2em]">

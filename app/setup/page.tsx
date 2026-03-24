@@ -22,7 +22,7 @@ export default async function SetupPage() {
               Create the admin account for this self-hosted CES workspace.
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-              This replaces the old SaaS signup flow. After setup, the dashboard lets you add Google CX agents, connect WhatsApp or website channels, map channels to agents, and monitor conversations.
+              This replaces the old SaaS signup flow. After setup, the dashboard lets you add Google agents, connect WhatsApp or website channels, map channels to agents, and monitor conversations.
             </p>
           </div>
         </section>

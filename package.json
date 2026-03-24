@@ -15,9 +15,11 @@
     "db:push": "drizzle-kit push",
     "db:repair:messages": "node scripts/repair-whatsapp-message-index.mjs",
     "db:studio": "drizzle-kit studio",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --import=tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
+    "@google-cloud/dialogflow-cx": "^5.7.0",
     "@hookform/resolvers": "^5.2.2",
     "bullmq": "^5.69.3",
     "class-variance-authority": "^0.7.1",

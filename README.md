@@ -1,11 +1,11 @@
 # CES Connector
 
-CES Connector is a self-hosted admin console for routing WhatsApp and website widget conversations into Google Customer Engagement Suite (CES) agents.
+CES Connector is a self-hosted admin console for routing WhatsApp and website widget conversations into Google Customer Engagement Suite (CES) and Conversational Agents platforms.
 
 ## What It Does
 
 - Create a local admin account on first run.
-- Add Google CX agents with CES app version + service account credentials.
+- Add Google agents with either CES Agent Studio or Conversational Agents configuration plus service account credentials.
 - Add WhatsApp channels and website widget channels.
 - Map each channel to exactly one agent.
 - View live conversations and switch between AI mode and human takeover.
@@ -20,7 +20,7 @@ Channel endpoint (/api/webhooks/[connectionId] or /api/widget/[connectionId])
    | resolves mapped agent
    v
 BullMQ Worker / direct widget execution
-   | calls CES API, persists messages, publishes realtime updates
+   | calls Google agent API, persists messages, publishes realtime updates
    v
 PostgreSQL + Redis pub/sub + SSE
    v
@@ -34,6 +34,7 @@ Admin Console (/dashboard, /channels, /agents, /mappings, /conversations)
 - PostgreSQL + Drizzle ORM
 - BullMQ + Redis
 - Google CES Agent Studio REST API
+- Google Dialogflow CX / Conversational Agents client library
 - WhatsApp Cloud API
 - shadcn/ui + Tailwind CSS
 - Docker Compose deployment
@@ -50,7 +51,7 @@ Admin Console (/dashboard, /channels, /agents, /mappings, /conversations)
 3. Docker + Docker Compose
 4. Credentials for:
    - Meta Developer / WhatsApp Cloud API
-   - Google Cloud with CES enabled and a service account JSON
+   - Google Cloud with CES or Conversational Agents enabled and a service account JSON
 
 ## Quick Start
 
@@ -109,20 +110,21 @@ Create the initial admin account, then log in to the internal dashboard.
 
 ## Admin Workflow
 
-1. Add a Google CX agent.
-2. Add a WhatsApp channel or website widget channel.
-3. Map the channel to an agent.
-4. Configure the public integration:
+1. Add a Google agent.
+2. Choose CES Agent Studio or Conversational Agents.
+3. Add a WhatsApp channel or website widget channel.
+4. Map the channel to an agent.
+5. Configure the public integration:
    - WhatsApp: use the webhook URL + verify token shown on the channel detail page.
    - Website widget: use the generated embed script shown on the channel detail page.
-5. Monitor and manage conversations from `/conversations`.
+6. Monitor and manage conversations from `/conversations`.
 
 ## Human Takeover
 
 From a conversation page:
 
 - `Take Over` pauses AI replies.
-- `Return to AI` resumes CES replies.
+- `Return to AI` resumes Google agent replies.
 - Human messages can optionally be excluded from the AI handoff context.
 
 ## Database Commands
@@ -133,6 +135,13 @@ pnpm db:migrate
 pnpm db:push
 pnpm db:repair:messages
 pnpm db:studio
+```
+
+## Testing
+
+```bash
+pnpm test
+pnpm lint
 ```
 
 ## Production Deployment

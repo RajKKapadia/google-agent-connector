@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { getAgentPlatformLabel, type AgentPlatform } from "@/lib/agents/config";
 import { assignChannelAgent } from "@/lib/actions/mappings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/table";
 
 interface MappingManagerProps {
-  agents: Array<{ id: string; name: string }>;
+  agents: Array<{ id: string; name: string; platform: AgentPlatform }>;
   channels: Array<{
     id: string;
     name: string;
@@ -94,14 +95,14 @@ export function MappingManager({ agents, channels }: MappingManagerProps) {
                     }))
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select agent" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unmapped">Unmapped</SelectItem>
                     {agents.map((agent) => (
                       <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
+                        {agent.name} ({getAgentPlatformLabel(agent.platform)})
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -2,7 +2,7 @@ import { Worker, Job } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { channels, endUserSessions, messages } from "@/lib/db/schema";
-import { createCESClient } from "@/lib/ces/client";
+import { createGoogleAgentClient } from "@/lib/google-agent/client";
 import { createWhatsAppClient } from "@/lib/whatsapp/client";
 import { buildCesInput } from "@/lib/sessions/ces";
 import { createMessageEvent, publishSessionEvent } from "@/lib/sessions/realtime";
@@ -115,12 +115,11 @@ export async function processMessage(job: Job<MessageJobData>): Promise<void> {
       return;
     }
 
-    const cesClient = createCESClient(channel.agent);
-    const cesResponse = await cesClient.runSession(
+    const agentClient = createGoogleAgentClient(channel.agent);
+    const responseText = await agentClient.sendText(
       session.cesSessionId,
       buildCesInput(messageText, session.pendingCesContext)
     );
-    const responseText = cesClient.extractTextResponse(cesResponse);
 
     const waClient = createWhatsAppClient(channel);
     await waClient.sendTextMessage({ to: waId, text: responseText });
