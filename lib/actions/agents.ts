@@ -13,8 +13,6 @@ import { db } from "@/lib/db";
 import { agents } from "@/lib/db/schema";
 import type { ActionResult } from "@/lib/actions/types";
 
-export type { AgentFormData };
-
 export async function createAgent(
   formData: AgentFormData
 ): Promise<ActionResult<{ id: string }>> {
