@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { channels, endUserSessions } from "@/lib/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConversationsAutoRefresh } from "@/components/conversations/conversations-auto-refresh";
 import { getWebsiteSessionPresenceMap } from "@/lib/sessions/presence";
 import {
   Table,
@@ -66,6 +67,7 @@ export default async function ConversationsPage({
 
   return (
     <div className="space-y-6">
+      <ConversationsAutoRefresh />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Conversations</h1>

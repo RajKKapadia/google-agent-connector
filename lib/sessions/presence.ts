@@ -26,6 +26,21 @@ export async function touchWebsiteSessionPresence(
   );
 }
 
+export async function refreshWebsiteSessionPresence(sessionId: string) {
+  const redis = createRedisClient();
+
+  try {
+    await touchWebsiteSessionPresence(redis, sessionId);
+  } catch (error) {
+    console.error("Failed to refresh website session presence", {
+      sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    redis.disconnect();
+  }
+}
+
 export async function isWebsiteSessionActive(sessionId: string) {
   const redis = createRedisClient();
 
