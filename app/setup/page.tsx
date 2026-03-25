@@ -19,7 +19,7 @@ export default async function SetupPage() {
           </span>
           <div className="space-y-4">
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
-              Create the admin account for this self-hosted CES workspace.
+              Create the admin account for this self-hosted Google AI workspace.
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
               This replaces the old SaaS signup flow. After setup, the dashboard lets you add Google agents, connect WhatsApp or website channels, map channels to agents, and monitor conversations.

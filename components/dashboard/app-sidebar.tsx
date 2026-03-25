@@ -20,7 +20,7 @@ export function AppSidebar() {
     <aside className="w-64 border-r bg-background/80 backdrop-blur shrink-0">
       <div className="flex h-14 items-center border-b px-4">
         <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
-          CES Connector
+          Google AI Connector
         </Link>
       </div>
       <nav className="space-y-1 p-3">

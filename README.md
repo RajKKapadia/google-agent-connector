@@ -1,6 +1,6 @@
-# CES Connector
+# Google AI Connector
 
-CES Connector is a self-hosted admin console for routing customer conversations from WhatsApp and an embeddable website chat widget into Google agents.
+Google AI Connector is a self-hosted admin console for routing customer conversations from WhatsApp and an embeddable website chat widget into Google agents.
 
 It supports two Google targets:
 
@@ -130,7 +130,7 @@ Create the initial admin user there. After that, the normal flow is:
 
 ### WhatsApp
 
-Use this when you want CES Connector to receive Meta webhook events and send outbound WhatsApp replies.
+Use this when you want Google AI Connector to receive Meta webhook events and send outbound WhatsApp replies.
 
 You will configure:
 

@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide covers two supported ways to run CES Connector:
+This guide covers two supported ways to run Google AI Connector:
 
 - local development on your machine
 - production deployment on a single server with Docker Compose
@@ -189,4 +189,3 @@ Make sure:
 - the stack is already running
 - `DATABASE_URL` uses the `postgres` hostname in `.env.production`
 - the credentials in `DATABASE_URL` match `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`
-

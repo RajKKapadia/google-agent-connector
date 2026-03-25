@@ -40,7 +40,7 @@ export function MobileNav() {
         </SheetHeader>
         <div className="flex h-14 items-center border-b px-4">
           <Link href="/dashboard" className="text-lg font-semibold" onClick={() => setOpen(false)}>
-            CES Connector
+            Google AI Connector
           </Link>
         </div>
         <nav className="space-y-1 p-3">

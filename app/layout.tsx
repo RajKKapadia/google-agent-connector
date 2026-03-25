@@ -3,8 +3,8 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CES Connector Admin",
-  description: "Self-hosted admin console for CES channels and conversations",
+  title: "Google AI Connector Admin",
+  description: "Self-hosted admin console for Google agent channels and conversations",
 };
 
 export default function RootLayout({

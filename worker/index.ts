@@ -2,7 +2,7 @@ import { createMessageWorker } from "@/lib/queue/worker";
 import { getWorkerConcurrency } from "@/lib/queue/config";
 
 console.log(
-  `[Worker] Starting CES Connector worker with concurrency ${getWorkerConcurrency()}...`
+  `[Worker] Starting Google AI Connector worker with concurrency ${getWorkerConcurrency()}...`
 );
 
 const worker = createMessageWorker();
