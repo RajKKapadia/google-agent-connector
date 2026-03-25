@@ -9,6 +9,7 @@ import {
   publishSessionEvent,
   serializeSessionMessage,
 } from "@/lib/sessions/realtime";
+import { refreshWebsiteSessionPresence } from "@/lib/sessions/presence";
 import { verifyWidgetAccessToken } from "@/lib/widget/security";
 
 export async function POST(
@@ -89,6 +90,8 @@ export async function POST(
       { status: 500 }
     );
   }
+
+  await refreshWebsiteSessionPresence(session.id);
 
   const [incomingMessage] = await db
     .insert(messages)
