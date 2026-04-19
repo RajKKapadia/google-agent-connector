@@ -44,3 +44,7 @@ drizzle/migrations/*.sql
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Custom files
+.codex
+

@@ -1,29 +1,103 @@
-# Google AI Connector
+# Google Agent Connector for Dialogflow CX, Google CES, WhatsApp, and Website Chat
 
-Google AI Connector is a self-hosted admin console for routing customer conversations from WhatsApp and an embeddable website chat widget into Google agents.
+Google Agent Connector, labeled in the UI as Google AI Connector, is a self-hosted admin console for routing customer conversations from WhatsApp and an embeddable website chat widget into Google agents. It is built for teams that want to connect Google Customer Engagement Suite (CES) Agent Studio or Google Conversational Agents / Dialogflow CX to real inbound channels, monitor live sessions, and enable human takeover when automation should pause.
 
-It supports two Google targets:
+This project is useful if you are searching for a:
+
+- self-hosted Dialogflow CX connector
+- Google Customer Engagement Suite Agent Studio connector
+- WhatsApp to Dialogflow CX integration layer
+- website chat widget for Google agents
+- human handoff console for Google AI customer support workflows
+
+## Overview
+
+Google Agent Connector gives internal support and operations teams one place to:
+
+- connect WhatsApp Cloud API and website chat widget channels
+- map each channel to exactly one Google agent
+- store Google credentials and channel secrets in encrypted form
+- persist sessions and messages in PostgreSQL
+- process inbound and outbound events through Redis and BullMQ
+- monitor conversations in a dashboard with optional human takeover
+
+The product is designed for self-hosted deployments where you want operational control over credentials, routing, auditing, and channel configuration instead of relying on a managed SaaS layer.
+
+## Supported Google Agent Targets
+
+Google Agent Connector currently supports two Google backends:
 
 - Google Customer Engagement Suite (CES) Agent Studio
 - Google Conversational Agents / Dialogflow CX
 
-The app gives an internal team one place to configure channels, map each channel to an agent, and monitor live conversations with optional human takeover.
+If you need a single admin console for both CES and Dialogflow CX environments, this repository provides that routing layer.
 
-## What the App Does
+## Supported Channels
 
-- Creates the first admin account locally on initial startup
-- Stores Google agent credentials and channel secrets in encrypted form
-- Accepts inbound traffic from WhatsApp Cloud API webhooks
-- Serves a website chat widget plus its event endpoints
-- Routes each channel to exactly one Google agent
-- Persists sessions and messages in PostgreSQL
-- Uses Redis and BullMQ for background processing and realtime updates
-- Lets operators switch a conversation between AI mode and human mode
+### WhatsApp Cloud API
+
+Use a WhatsApp channel when you want Meta webhook traffic and outbound WhatsApp replies to flow through a mapped Google agent.
+
+You configure:
+
+- Meta App ID
+- Meta App Secret
+- Phone Number ID
+- WhatsApp access token
+
+After setup, the dashboard provides the webhook URL and verify token required in Meta.
+
+### Website Chat Widget
+
+Use a website widget channel when you want to embed chat on your own site and send website visitor messages to a Google agent.
+
+You configure:
+
+- allowed site or domain
+- widget title
+- optional bubble color
+- optional font family
+
+After setup, the dashboard provides the embed script to place before `</body>`.
+
+## Core Features
+
+### Self-Hosted Google Agent Routing
+
+- route inbound traffic from WhatsApp or website chat to a specific Google agent
+- keep channel-to-agent mappings explicit and easy to audit
+- run the admin console in your own infrastructure
+
+### Live Conversation Operations
+
+- monitor sessions and messages in real time
+- switch a conversation between `ai` mode and `human` mode
+- return a session to AI later after manual intervention
+
+### Human Takeover and Handoff
+
+- pause AI replies when a human operator should respond
+- send manual replies from the dashboard
+- optionally exclude human messages from the next AI handoff context
+
+### Secure Credential Handling
+
+- store Google agent credentials and channel secrets in encrypted form
+- verify WhatsApp webhook signatures per channel
+- keep public widget and webhook endpoints isolated from dashboard authentication
+
+## Common Use Cases
+
+- connect WhatsApp support to Dialogflow CX
+- connect WhatsApp support to Google CES Agent Studio
+- embed a website chat widget that talks to a Google agent
+- operate a hybrid AI plus human support workflow
+- self-host a Google agent integration layer for regulated or internal environments
 
 ## How It Works
 
 ```text
-WhatsApp user / website visitor
+WhatsApp user or website visitor
         |
         v
 Public webhook or widget endpoint
@@ -35,18 +109,18 @@ Mapped Google agent is resolved
 Worker processes the message and stores conversation history
         |
         v
-Dashboard shows the conversation and allows human takeover
+Dashboard shows the conversation and supports AI or human response mode
 ```
 
-## Stack
+## Tech Stack
 
 - Next.js 16 with App Router
 - TypeScript
 - PostgreSQL with Drizzle ORM
-- Redis + BullMQ
-- Google CES API and Dialogflow CX client
+- Redis and BullMQ
+- Google CES API and Dialogflow CX client libraries
 - WhatsApp Cloud API
-- Tailwind CSS + shadcn/ui
+- Tailwind CSS and shadcn/ui
 - Docker Compose for local and production deployment
 
 ## Prerequisites
@@ -54,12 +128,12 @@ Dashboard shows the conversation and allows human takeover
 - Node.js 20+
 - pnpm
 - Docker Engine with Docker Compose
-- A PostgreSQL database
-- A Redis instance
-- Google Cloud service account credentials for CES or Conversational Agents
+- PostgreSQL
+- Redis
+- Google Cloud service account credentials for CES or Dialogflow CX
 - Meta WhatsApp Cloud API credentials if you want WhatsApp support
 
-## Local Development
+## Quick Start
 
 ### 1. Install dependencies
 
@@ -116,52 +190,15 @@ The app runs at `http://localhost:3000`.
 
 ## First Run
 
-On a fresh database, the app redirects to `/setup`.
+On a fresh database, the app redirects to `/setup` so you can create the initial admin account locally.
 
-Create the initial admin user there. After that, the normal flow is:
+Typical setup flow:
 
 1. Add a Google agent
 2. Add a channel
 3. Map the channel to the agent
-4. Test traffic through WhatsApp or the website widget
+4. Send test traffic through WhatsApp or the website widget
 5. Monitor and manage conversations from the dashboard
-
-## Channel Types
-
-### WhatsApp
-
-Use this when you want Google AI Connector to receive Meta webhook events and send outbound WhatsApp replies.
-
-You will configure:
-
-- Meta App ID
-- Meta App Secret
-- Phone Number ID
-- WhatsApp access token
-
-After creating the channel, the dashboard gives you the webhook URL and verify token needed in Meta.
-
-### Website Widget
-
-Use this when you want to embed a chat widget on your own site.
-
-You will configure:
-
-- Allowed site or domain
-- Widget title
-- Optional bubble color
-- Optional font family
-
-After creating the channel, the dashboard provides the embed script to place before `</body>`.
-
-## Human Takeover
-
-Each conversation can run in one of two modes:
-
-- `ai`: incoming messages are routed to the configured Google agent
-- `human`: an operator responds manually from the dashboard
-
-Operators can return the session to AI mode later, and the app can exclude human messages from the next AI handoff context when needed.
 
 ## Available Commands
 
@@ -175,12 +212,13 @@ pnpm worker:start
 pnpm db:generate
 pnpm db:migrate
 pnpm db:push
+pnpm db:repair:messages
 pnpm db:studio
 pnpm lint
 pnpm test
 ```
 
-## Production
+## Production Deployment
 
 For a full deployment walkthrough, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -197,10 +235,39 @@ Production expects:
 
 - a public HTTPS URL in `NEXT_PUBLIC_APP_URL`
 - a reverse proxy in front of the app
-- `app` to stay single-replica
-- workers to be scaled independently
+- `app` to remain single-replica
+- workers to scale independently
 
-## Repository Notes
+## Why Teams Use This Project
+
+- It provides a self-hosted control plane for Google agent channel routing.
+- It supports both WhatsApp and website chat without building custom glue code from scratch.
+- It gives operators a practical human takeover workflow instead of forcing every session through automation.
+- It keeps deployment, credentials, and message storage inside infrastructure you manage.
+
+## FAQ
+
+### Can I use this project as a WhatsApp to Dialogflow CX connector?
+
+Yes. A WhatsApp channel can receive Meta webhook events, route them to a mapped Dialogflow CX agent, and return replies through the same channel.
+
+### Can I connect Google Customer Engagement Suite Agent Studio to WhatsApp?
+
+Yes. Google Agent Connector supports CES Agent Studio as one of its two Google backends, alongside Dialogflow CX.
+
+### Does this include a website chat widget for Google agents?
+
+Yes. The app serves a website widget plus its event endpoints, and the dashboard gives you the embed script after channel setup.
+
+### Does it support live agent handoff or human takeover?
+
+Yes. Each conversation can switch between `ai` mode and `human` mode, allowing operators to take over and later return the session to AI.
+
+### Is this SaaS or self-hosted?
+
+This project is self-hosted. It is intended for teams that want to run the admin console, worker, database, and queue infrastructure themselves.
+
+## Repository Structure
 
 - `app/`: Next.js routes, pages, and API endpoints
 - `components/`: dashboard, auth, widget, and UI components
@@ -211,10 +278,10 @@ Production expects:
 
 ## Security
 
-- Admin access uses signed HTTP-only session cookies
-- Sensitive Google and channel credentials are encrypted before storage
+- admin access uses signed HTTP-only session cookies
+- sensitive Google and channel credentials are encrypted before storage
 - WhatsApp webhook requests are verified per channel
-- Public webhook and widget endpoints are intentionally unauthenticated
+- public webhook and widget endpoints are intentionally unauthenticated
 
 ## License
 
